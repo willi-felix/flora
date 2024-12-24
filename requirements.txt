@@ -1,4 +1,6 @@
-Flask==3.0.3
-Flask-SQLAlchemy==3.0.5
-Flask-WTF==1.1.1
-WTForms==3.0.1
+Flask
+Flask-SQLAlchemy
+Flask-WTF
+WTForms
+dotenv
+sqlitecloud
