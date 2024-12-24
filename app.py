@@ -93,7 +93,7 @@ def create_app():
             current_year=current_year
         )
 
-    @app.route('/reviews/<int:record_id>', methods=['POST'])
+    @app.route('/review/<int:record_id>', methods=['POST'])
     def review_record(record_id):
         ip_address = request.remote_addr
         with conn:
