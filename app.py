@@ -19,23 +19,9 @@ def create_app():
                 sentence TEXT NOT NULL,
                 mean TEXT NOT NULL,
                 example TEXT NOT NULL,
-                approved BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS reports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_id INTEGER NOT NULL,
-                reason TEXT NOT NULL,
-                FOREIGN KEY (record_id) REFERENCES records (id)
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS ratings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_id INTEGER NOT NULL,
-                rating INTEGER NOT NULL,
-                FOREIGN KEY (record_id) REFERENCES records (id)
+                approved BOOLEAN DEFAULT FALSE,
+                reports INTEGER DEFAULT 0,
+                ratings INTEGER DEFAULT 0
             )
         ''')
 
@@ -48,6 +34,9 @@ def create_app():
 
     @app.route('/add', methods=['GET', 'POST'])
     def add_record():
+        current_year = datetime.now().year
+        site_name = app.config['SITE_NAME']
+        slogan = app.config['SLOGAN']
         if request.method == 'POST':
             lang = request.form['lang']
             sentence = request.form['sentence']
@@ -60,38 +49,40 @@ def create_app():
                 )
             flash('Record added successfully! Awaiting approval.')
             return redirect(url_for('home'))
-        return render_template('add_record.html')
+        return render_template('add_record.html', site_name=site_name, slogan=slogan, current_year=current_year)
 
     @app.route('/search', methods=['GET', 'POST'])
     def search():
         query = request.args.get('query', '').strip()
         results = []
-        suggestions = []
+        similar = []
         if query:
             with conn:
                 cursor = conn.execute(
-                    'SELECT id, sentence, lang, mean, example FROM records WHERE (sentence LIKE ? OR mean LIKE ?) AND approved = ?',
-                    (f'%{query}%', f'%{query}%', True)
+                    'SELECT id, sentence, lang, mean, example, ratings FROM records WHERE sentence LIKE ? AND approved = ?',
+                    (f'%{query}%', True)
                 )
                 results = [
-                    {'id': row[0], 'sentence': row[1], 'lang': row[2], 'mean': row[3], 'example': row[4]}
+                    {'id': row[0], 'sentence': row[1], 'lang': row[2], 'mean': row[3], 'example': row[4], 'ratings': row[5]}
                     for row in cursor.fetchall()
                 ]
-            if not results:
-                cursor = conn.execute(
-                    'SELECT sentence, mean FROM records WHERE approved = ? ORDER BY RANDOM() LIMIT 5',
-                    (True,)
-                )
-                suggestions = [{'sentence': row[0], 'mean': row[1]} for row in cursor.fetchall()]
-
+                if not results:
+                    cursor = conn.execute(
+                        'SELECT id, sentence, lang, mean, example FROM records WHERE approved = ? ORDER BY RANDOM() LIMIT 5',
+                        (True,)
+                    )
+                    similar = [
+                        {'id': row[0], 'sentence': row[1], 'lang': row[2], 'mean': row[3], 'example': row[4]}
+                        for row in cursor.fetchall()
+                    ]
         current_year = datetime.now().year
         site_name = app.config['SITE_NAME']
         slogan = app.config['SLOGAN']
         return render_template(
             'search_results.html',
             results=results,
-            suggestions=suggestions,
             query=query,
+            similar=similar,
             site_name=site_name,
             slogan=slogan,
             current_year=current_year
@@ -99,44 +90,37 @@ def create_app():
 
     @app.route('/rate/<int:record_id>', methods=['POST'])
     def rate_record(record_id):
-        rating = request.form['rating']
         with conn:
-            conn.execute(
-                'INSERT INTO ratings (record_id, rating) VALUES (?, ?)',
-                (record_id, rating)
-            )
+            conn.execute('UPDATE records SET ratings = ratings + 1 WHERE id = ?', (record_id,))
         flash('Thank you for your rating!')
-        return redirect(request.referrer)
+        return redirect(url_for('search', query=request.form.get('query', '')))
 
     @app.route('/report/<int:record_id>', methods=['POST'])
     def report_record(record_id):
-        reason = request.form['reason']
         with conn:
-            conn.execute(
-                'INSERT INTO reports (record_id, reason) VALUES (?, ?)',
-                (record_id, reason)
-            )
-        flash('Thank you for your report! It has been submitted.')
-        return redirect(request.referrer)
+            conn.execute('UPDATE records SET reports = reports + 1 WHERE id = ?', (record_id,))
+        flash('Report submitted. Thank you for your feedback.')
+        return redirect(url_for('search', query=request.form.get('query', '')))
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
         if request.args.get('key') != "William12@OD":
             return "Unauthorized Access", 403
         with conn:
-            cursor = conn.execute('SELECT id, lang, sentence, approved FROM records')
+            cursor = conn.execute('SELECT id, lang, sentence, approved, reports FROM records')
             records = [
-                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3])}
+                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'reports': row[4]}
                 for row in cursor.fetchall()
             ]
-            cursor = conn.execute('SELECT record_id, COUNT(*) AS report_count FROM reports GROUP BY record_id')
-            reports = [{'record_id': row[0], 'count': row[1]} for row in cursor.fetchall()]
         total_records = len(records)
+        site_name = app.config['SITE_NAME']
+        slogan = app.config['SLOGAN']
         return render_template(
             'admin_dashboard.html',
             records=records,
-            reports=reports,
-            total_records=total_records
+            total_records=total_records,
+            site_name=site_name,
+            slogan=slogan
         )
 
     return app
