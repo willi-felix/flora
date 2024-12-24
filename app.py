@@ -3,7 +3,6 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
-import sqlitecloud
 
 load_dotenv()
 
