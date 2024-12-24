@@ -18,10 +18,10 @@ class Record(db.Model):
 
 def create_app():
     app = Flask(__name__)
-    db_path = os.path.join(".", "dictionary.db")
+    db_path = os.path.join("/tmp", "dictionary.db")
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef')
 
     db.init_app(app)
 
