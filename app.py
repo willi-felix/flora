@@ -4,13 +4,10 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Initialize the database
 db = SQLAlchemy()
 
-# Define the database model
 class Record(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lang = db.Column(db.String(50), nullable=False)
@@ -21,36 +18,27 @@ class Record(db.Model):
 
 def create_app():
     app = Flask(__name__)
-
-    # Set the database path in the current directory
-    db_path = os.path.join(".", "dictionary.db")  # Save the database in the current directory
-    print(f"Database path: {db_path}")  # Debug: Print the path for visibility
-
-    # Set Flask app config
+    db_path = os.path.join(".", "dictionary.db")
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')  # Load from env variable
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
     db.init_app(app)
 
-    # Ensure the database is created if it doesn't exist
     with app.app_context():
         if not os.path.exists(db_path):
-            print("Database not found. Creating a new database...")
-        db.create_all()  # Create the database and tables if they don't exist
-        print("Database and tables initialized successfully!")
+            db.create_all()
 
-    # Define routes and views
     @app.route('/')
     def home():
-        current_year = datetime.now().year  # Get the current year
-        site_name = os.getenv('SITE_NAME', 'DicGo')  # Default to 'DicGo' if not set
-        slogan = os.getenv('SLOGAN', 'Search & Learn Effortlessly')  # Default slogan
+        current_year = datetime.now().year
+        site_name = os.getenv('SITE_NAME', 'Dicgo')
+        slogan = os.getenv('SLOGAN', 'Search & Learn Effortlessly')
         return render_template('home.html', site_name=site_name, slogan=slogan, current_year=current_year)
 
     @app.route('/add', methods=['GET', 'POST'])
     def add_record():
-        current_year = datetime.now().year  # Get the current year
+        current_year = datetime.now().year
         site_name = os.getenv('SITE_NAME', 'DicGo')
         slogan = os.getenv('SLOGAN', 'Search & Learn Effortlessly')
         if request.method == 'POST':
@@ -69,7 +57,7 @@ def create_app():
     def search():
         query = request.args.get('query', '')
         results = Record.query.filter(Record.sentence.contains(query), Record.approved.is_(True)).all()
-        current_year = datetime.now().year  # Get the current year
+        current_year = datetime.now().year
         site_name = os.getenv('SITE_NAME', 'DicGo')
         slogan = os.getenv('SLOGAN', 'Search & Learn Effortlessly')
         return render_template('search_results.html', results=results, query=query, site_name=site_name, slogan=slogan, current_year=current_year)
@@ -101,6 +89,7 @@ def create_app():
 
     return app
 
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
     app.run(debug=True)
