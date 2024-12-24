@@ -31,7 +31,8 @@
                     {% else %}
                         <span class="text-green-500 font-semibold">Approved</span>
                     {% endif %}
-
+                    
+                    <!-- Edit button -->
                     <form action="{{ url_for('edit_record', record_id=record['id']) }}" method="GET" class="inline ml-2">
                         <button 
                             type="submit" 
@@ -40,29 +41,12 @@
                         </button>
                     </form>
 
+                    <!-- Delete button -->
                     <form action="{{ url_for('delete_record', record_id=record['id']) }}" method="POST" class="inline ml-2" onsubmit="return confirm('Are you sure you want to delete this record?');">
                         <button 
                             type="submit" 
                             class="bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600">
                             Delete
-                        </button>
-                    </form>
-
-                    <!-- Review Button (redirect to admin view) -->
-                    <form action="{{ url_for('admin_review', record_id=record['id']) }}" method="GET" class="inline ml-2">
-                        <button 
-                            type="submit" 
-                            class="bg-yellow-400 text-white px-3 py-1 rounded-md text-sm hover:bg-yellow-500">
-                            <span class="material-icons">star</span> Reviews
-                        </button>
-                    </form>
-
-                    <!-- Flag Button (redirect to admin view) -->
-                    <form action="{{ url_for('admin_report', record_id=record['id']) }}" method="GET" class="inline ml-2">
-                        <button 
-                            type="submit" 
-                            class="bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600">
-                            <span class="material-icons">report</span> Flags
                         </button>
                     </form>
                 </td>
@@ -71,4 +55,4 @@
         </tbody>
     </table>
 </div>
-{% endblock %}
+{% endblock %}
