@@ -102,7 +102,7 @@ def create_app():
                 (record_id, ip_address)
             )
         flash('Thank you for your review!')
-        return redirect(url_for('home'))
+        return redirect(request.referrer)  # Redirect back to the same page after review
 
     @app.route('/report/<int:record_id>', methods=['POST'])
     def report_record(record_id):
@@ -113,7 +113,7 @@ def create_app():
                 (record_id, ip_address)
             )
         flash('The record has been reported for review.')
-        return redirect(url_for('home'))
+        return redirect(request.referrer)  # Redirect back to the same page after report
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
