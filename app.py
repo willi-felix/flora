@@ -2,11 +2,12 @@ import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
 
-# Initialize the database
+load_dotenv()
+
 db = SQLAlchemy()
 
-# Define the database model
 class Record(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lang = db.Column(db.String(50), nullable=False)
@@ -18,22 +19,17 @@ class Record(db.Model):
 def create_app():
     app = Flask(__name__)
 
-    # Set the database path in the current directory
-    db_path = os.path.join(".", "dictionary.db")  # Save the database in the current directory
-    print(f"Database path: {db_path}")  # Debug: Print the path for visibility
-
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    # Load configurations from environment variables
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = 'ffe2051a08decc167d5f237589776ecd5bbb5bc0a317f02445944251798c68a6'
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
     db.init_app(app)
 
-    # Ensure the database is created if it doesn't exist
+    # Ensure the database is connected
     with app.app_context():
-        if not os.path.exists(db_path):
-            print("Database not found. Creating a new database...")
-        db.create_all()  # Create the database and tables if they don't exist
-        print("Database and tables initialized successfully!")
+        db.create_all()  # Ensure the tables exist
+        print("Database connected and tables initialized!")
 
     # Define routes and views
     @app.route('/')
@@ -63,7 +59,7 @@ def create_app():
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
-        if request.args.get('key') != "William12@OD":
+        if request.args.get('key') != os.getenv('ADMIN_ACCESS_KEY'):
             return "Unauthorized Access", 403
         records = Record.query.all()
         return render_template('admin_dashboard.html', records=records)
@@ -75,7 +71,7 @@ def create_app():
             record.approved = True
             db.session.commit()
             flash('Record approved!')
-        return redirect(url_for('admin_dashboard', key="William12@OD"))
+        return redirect(url_for('admin_dashboard', key=os.getenv('ADMIN_ACCESS_KEY')))
 
     @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
@@ -84,7 +80,7 @@ def create_app():
             db.session.delete(record)
             db.session.commit()
             flash('Record deleted!')
-        return redirect(url_for('admin_dashboard', key="William12@OD"))
+        return redirect(url_for('admin_dashboard', key=os.getenv('ADMIN_ACCESS_KEY')))
 
     return app
 
