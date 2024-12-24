@@ -48,7 +48,8 @@
                         </button>
                     </form>
 
-                    <form action="/review/{{ record['id'] }}" method="POST" class="inline ml-2">
+                    <!-- Review Button (redirect to admin view) -->
+                    <form action="{{ url_for('admin_review', record_id=record['id']) }}" method="GET" class="inline ml-2">
                         <button 
                             type="submit" 
                             class="bg-yellow-400 text-white px-3 py-1 rounded-md text-sm hover:bg-yellow-500">
@@ -56,7 +57,8 @@
                         </button>
                     </form>
 
-                    <form action="/flag/{{ record['id'] }}" method="POST" class="inline ml-2">
+                    <!-- Flag Button (redirect to admin view) -->
+                    <form action="{{ url_for('admin_report', record_id=record['id']) }}" method="GET" class="inline ml-2">
                         <button 
                             type="submit" 
                             class="bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600">
