@@ -1,7 +1,7 @@
-import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+import sqlitecloud
 
 db = SQLAlchemy()
 
@@ -15,12 +15,15 @@ class Record(db.Model):
 
 def create_app():
     app = Flask(__name__)
-    app.config['SITE_NAME'] = 'DicGo'
+    app.config['SITE_NAME'] = 'Dicgo'
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
-    db.init_app(app)
+
+    # SQLite Cloud connection string
+    connection_string = 'sqlitecloud://myhost.sqlite.cloud:8860/mydatabase.sqlite?apikey=myapikey'
+    engine = sqlitecloud.create_engine(connection_string)
+    db.init_app(app, engine=engine)
+
     with app.app_context():
         db.create_all()
 
