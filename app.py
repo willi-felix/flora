@@ -15,7 +15,7 @@ class Record(db.Model):
 
 def create_app():
     app = Flask(__name__)
-    app.config['SITE_NAME'] = 'Dicgo'
+    app.config['SITE_NAME'] = 'DicGo'
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
