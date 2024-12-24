@@ -8,9 +8,11 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
+    # SQLite Cloud connection using sqlitecloud module
     connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
     conn = sqlitecloud.connect(connection_string)
 
+    # Create the `records` table if it doesn't exist
     with conn:
         conn.execute('''
             CREATE TABLE IF NOT EXISTS records (
@@ -20,24 +22,6 @@ def create_app():
                 mean TEXT NOT NULL,
                 example TEXT NOT NULL,
                 approved BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS reviews (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_id INTEGER NOT NULL,
-                ip_address TEXT NOT NULL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (record_id) REFERENCES records (id)
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS reports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                record_id INTEGER NOT NULL,
-                ip_address TEXT NOT NULL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (record_id) REFERENCES records (id)
             )
         ''')
 
@@ -71,14 +55,14 @@ def create_app():
     def search():
         query = request.args.get('query', '').strip()
         results = []
-        if query:
+        if query:  # Kiểm tra nếu có từ khóa tìm kiếm
             with conn:
                 cursor = conn.execute(
-                    'SELECT id, sentence, lang, mean, example FROM records WHERE (sentence LIKE ? OR mean LIKE ?) AND approved = ?',
-                    (f'%{query}%', f'%{query}%', True)
+                    'SELECT sentence, lang, mean, example FROM records WHERE sentence LIKE ? AND approved = ?',
+                    (f'%{query}%', True)
                 )
                 results = [
-                    {'id': row[0], 'sentence': row[1], 'lang': row[2], 'mean': row[3], 'example': row[4]}
+                    {'sentence': row[0], 'lang': row[1], 'mean': row[2], 'example': row[3]}
                     for row in cursor.fetchall()
                 ]
         current_year = datetime.now().year
@@ -93,93 +77,26 @@ def create_app():
             current_year=current_year
         )
 
-    @app.route('/review/<int:record_id>', methods=['POST'])
-    def review_record(record_id):
-        ip_address = request.remote_addr
-        with conn:
-            conn.execute(
-                'INSERT INTO reviews (record_id, ip_address) VALUES (?, ?)',
-                (record_id, ip_address)
-            )
-        flash('Thank you for your review!')
-        return redirect(request.referrer)  # Redirect back to the same page after review
-
-    @app.route('/report/<int:record_id>', methods=['POST'])
-    def report_record(record_id):
-        ip_address = request.remote_addr
-        with conn:
-            conn.execute(
-                'INSERT INTO reports (record_id, ip_address) VALUES (?, ?)',
-                (record_id, ip_address)
-            )
-        flash('The record has been reported for review.')
-        return redirect(request.referrer)  # Redirect back to the same page after report
-
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
         if request.args.get('key') != "William12@OD":
             return "Unauthorized Access", 403
+
         with conn:
             cursor = conn.execute('SELECT id, lang, sentence, approved FROM records')
             records = [
                 {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3])}
                 for row in cursor.fetchall()
             ]
+
         total_records = len(records)
         site_name = app.config['SITE_NAME']
         slogan = app.config['SLOGAN']
+
         return render_template(
             'admin_dashboard.html',
             records=records,
             total_records=total_records,
-            site_name=site_name,
-            slogan=slogan
-        )
-
-    @app.route('/admincp/review/<int:record_id>', methods=['GET'])
-    def admin_review(record_id):
-        if request.args.get('key') != "William12@OD":
-            return "Unauthorized Access", 403
-        with conn:
-            cursor = conn.execute('''
-                SELECT reviews.id, records.sentence, reviews.ip_address, reviews.timestamp
-                FROM reviews
-                JOIN records ON reviews.record_id = records.id
-                WHERE reviews.record_id = ?
-            ''', (record_id,))
-            reviews = [
-                {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
-                for row in cursor.fetchall()
-            ]
-        site_name = app.config['SITE_NAME']
-        slogan = app.config['SLOGAN']
-        return render_template(
-            'admin_review_list.html',
-            reviews=reviews,
-            site_name=site_name,
-            slogan=slogan
-        )
-
-    @app.route('/admincp/report/<int:record_id>', methods=['GET'])
-    def admin_report(record_id):
-        if request.args.get('key') != "William12@OD":
-            return "Unauthorized Access", 403
-        with conn:
-            cursor = conn.execute('''
-                SELECT reports.id, records.sentence, reports.ip_address, reports.timestamp
-                FROM reports
-                JOIN records ON reports.record_id = records.id
-                WHERE reports.record_id = ?
-            ''', (record_id,))
-            reports = [
-                {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
-                for row in cursor.fetchall()
-            ]
-        site_name = app.config['SITE_NAME']
-        slogan = app.config['SLOGAN']
-        return render_template(
-            'admin_report_list.html',
-            reports=reports,
             site_name=site_name,
             slogan=slogan
         )
@@ -189,12 +106,15 @@ def create_app():
         with conn:
             cursor = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,))
             record = cursor.fetchone()
+
             if record and record[0] == 1:
                 flash('This record has already been approved!', 'warning')
             else:
                 conn.execute('UPDATE records SET approved = ? WHERE id = ?', (True, record_id))
                 flash('Record approved!')
+
         return redirect(url_for('admin_dashboard', key="William12@OD"))
+
 
     @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
