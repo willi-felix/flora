@@ -53,17 +53,29 @@ def create_app():
 
     @app.route('/search', methods=['GET'])
     def search():
-        query = request.args.get('query', '')
-        with conn:
-            cursor = conn.execute(
-                'SELECT * FROM records WHERE sentence LIKE ? AND approved = ?',
-                (f'%{query}%', True)
-            )
-            results = cursor.fetchall()
+        query = request.args.get('query', '').strip()
+        results = []
+        if query:  # Kiểm tra nếu có từ khóa tìm kiếm
+            with conn:
+                cursor = conn.execute(
+                    'SELECT sentence, lang, mean, example FROM records WHERE sentence LIKE ? AND approved = ?',
+                    (f'%{query}%', True)
+                )
+                results = [
+                    {'sentence': row[0], 'lang': row[1], 'mean': row[2], 'example': row[3]}
+                    for row in cursor.fetchall()
+                ]
         current_year = datetime.now().year
         site_name = app.config['SITE_NAME']
         slogan = app.config['SLOGAN']
-        return render_template('search_results.html', results=results, query=query, site_name=site_name, slogan=slogan, current_year=current_year)
+        return render_template(
+            'search_results.html',
+            results=results,
+            query=query,
+            site_name=site_name,
+            slogan=slogan,
+            current_year=current_year
+        )
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
@@ -92,9 +104,17 @@ def create_app():
     @app.route('/admincp/approve/<int:record_id>', methods=['POST'])
     def approve_record(record_id):
         with conn:
-            conn.execute('UPDATE records SET approved = ? WHERE id = ?', (True, record_id))
-        flash('Record approved!')
+            cursor = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,))
+            record = cursor.fetchone()
+
+            if record and record[0] == 1:
+                flash('This record has already been approved!', 'warning')
+            else:
+                conn.execute('UPDATE records SET approved = ? WHERE id = ?', (True, record_id))
+                flash('Record approved!')
+
         return redirect(url_for('admin_dashboard', key="William12@OD"))
+
 
     @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
