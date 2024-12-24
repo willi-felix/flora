@@ -93,7 +93,7 @@ def create_app():
             current_year=current_year
         )
 
-    @app.route('/rate/<int:record_id>', methods=['POST'])
+    @app.route('/reviews/<int:record_id>', methods=['POST'])
     def review_record(record_id):
         ip_address = request.remote_addr
         with conn:
@@ -102,7 +102,7 @@ def create_app():
                 (record_id, ip_address)
             )
         flash('Thank you for your review!')
-        return redirect(url_for('search'))
+        return redirect(url_for('home'))
 
     @app.route('/report/<int:record_id>', methods=['POST'])
     def report_record(record_id):
@@ -113,7 +113,7 @@ def create_app():
                 (record_id, ip_address)
             )
         flash('The record has been reported for review.')
-        return redirect(url_for('search'))
+        return redirect(url_for('home'))
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
