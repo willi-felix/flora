@@ -22,6 +22,24 @@ def create_app():
                 approved BOOLEAN DEFAULT FALSE
             )
         ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_id INTEGER NOT NULL,
+                ip_address TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (record_id) REFERENCES records (id)
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_id INTEGER NOT NULL,
+                ip_address TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (record_id) REFERENCES records (id)
+            )
+        ''')
 
     @app.route('/')
     def home():
@@ -75,26 +93,78 @@ def create_app():
             current_year=current_year
         )
 
+    @app.route('/review/<int:record_id>', methods=['POST'])
+    def review_record(record_id):
+        ip_address = request.remote_addr
+        with conn:
+            conn.execute(
+                'INSERT INTO reviews (record_id, ip_address) VALUES (?, ?)',
+                (record_id, ip_address)
+            )
+        flash('Thank you for your review!')
+        return redirect(url_for('search'))
+
+    @app.route('/report/<int:record_id>', methods=['POST'])
+    def report_record(record_id):
+        ip_address = request.remote_addr
+        with conn:
+            conn.execute(
+                'INSERT INTO reports (record_id, ip_address) VALUES (?, ?)',
+                (record_id, ip_address)
+            )
+        flash('The record has been reported for review.')
+        return redirect(url_for('search'))
+
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
         if request.args.get('key') != "William12@OD":
             return "Unauthorized Access", 403
-
         with conn:
             cursor = conn.execute('SELECT id, lang, sentence, approved FROM records')
             records = [
                 {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3])}
                 for row in cursor.fetchall()
             ]
-
         total_records = len(records)
         site_name = app.config['SITE_NAME']
         slogan = app.config['SLOGAN']
-
         return render_template(
             'admin_dashboard.html',
             records=records,
             total_records=total_records,
+            site_name=site_name,
+            slogan=slogan
+        )
+
+    @app.route('/admincp/reviews_reports', methods=['GET'])
+    def reviews_reports():
+        if request.args.get('key') != "William12@OD":
+            return "Unauthorized Access", 403
+        with conn:
+            reviews_cursor = conn.execute('''
+                SELECT reviews.id, records.sentence, reviews.ip_address, reviews.timestamp
+                FROM reviews
+                JOIN records ON reviews.record_id = records.id
+            ''')
+            reviews = [
+                {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
+                for row in reviews_cursor.fetchall()
+            ]
+            reports_cursor = conn.execute('''
+                SELECT reports.id, records.sentence, reports.ip_address, reports.timestamp
+                FROM reports
+                JOIN records ON reports.record_id = records.id
+            ''')
+            reports = [
+                {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
+                for row in reports_cursor.fetchall()
+            ]
+        site_name = app.config['SITE_NAME']
+        slogan = app.config['SLOGAN']
+        return render_template(
+            'reviews_report_list.html',
+            reviews=reviews,
+            reports=reports,
             site_name=site_name,
             slogan=slogan
         )
@@ -104,13 +174,11 @@ def create_app():
         with conn:
             cursor = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,))
             record = cursor.fetchone()
-
             if record and record[0] == 1:
                 flash('This record has already been approved!', 'warning')
             else:
                 conn.execute('UPDATE records SET approved = ? WHERE id = ?', (True, record_id))
                 flash('Record approved!')
-
         return redirect(url_for('admin_dashboard', key="William12@OD"))
 
     @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
