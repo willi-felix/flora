@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
+import sqlitecloud
 
 load_dotenv()
 
@@ -18,23 +19,17 @@ class Record(db.Model):
 
 def create_app():
     app = Flask(__name__)
-
-    # Load configurations from environment variables
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-
     db.init_app(app)
 
-    # Ensure the database is connected
     with app.app_context():
-        db.create_all()  # Ensure the tables exist
-        print("Database connected and tables initialized!")
+        db.create_all()
 
-    # Define routes and views
     @app.route('/')
     def home():
-        current_year = datetime.now().year  # Get the current year
+        current_year = datetime.now().year
         return render_template('home.html', site_name="DicGo", slogan="Search & Learn Effortlessly", current_year=current_year)
 
     @app.route('/add', methods=['GET', 'POST'])
