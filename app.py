@@ -136,34 +136,49 @@ def create_app():
             slogan=slogan
         )
 
-    @app.route('/admincp/reviews_reports', methods=['GET'])
-    def reviews_reports():
+    @app.route('/admincp/review/<int:record_id>', methods=['GET'])
+    def admin_review(record_id):
         if request.args.get('key') != "William12@OD":
             return "Unauthorized Access", 403
         with conn:
-            reviews_cursor = conn.execute('''
+            cursor = conn.execute('''
                 SELECT reviews.id, records.sentence, reviews.ip_address, reviews.timestamp
                 FROM reviews
                 JOIN records ON reviews.record_id = records.id
-            ''')
+                WHERE reviews.record_id = ?
+            ''', (record_id,))
             reviews = [
                 {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
-                for row in reviews_cursor.fetchall()
-            ]
-            reports_cursor = conn.execute('''
-                SELECT reports.id, records.sentence, reports.ip_address, reports.timestamp
-                FROM reports
-                JOIN records ON reports.record_id = records.id
-            ''')
-            reports = [
-                {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
-                for row in reports_cursor.fetchall()
+                for row in cursor.fetchall()
             ]
         site_name = app.config['SITE_NAME']
         slogan = app.config['SLOGAN']
         return render_template(
-            'reviews_report_list.html',
+            'admin_review_list.html',
             reviews=reviews,
+            site_name=site_name,
+            slogan=slogan
+        )
+
+    @app.route('/admincp/report/<int:record_id>', methods=['GET'])
+    def admin_report(record_id):
+        if request.args.get('key') != "William12@OD":
+            return "Unauthorized Access", 403
+        with conn:
+            cursor = conn.execute('''
+                SELECT reports.id, records.sentence, reports.ip_address, reports.timestamp
+                FROM reports
+                JOIN records ON reports.record_id = records.id
+                WHERE reports.record_id = ?
+            ''', (record_id,))
+            reports = [
+                {'id': row[0], 'sentence': row[1], 'ip_address': row[2], 'timestamp': row[3]}
+                for row in cursor.fetchall()
+            ]
+        site_name = app.config['SITE_NAME']
+        slogan = app.config['SLOGAN']
+        return render_template(
+            'admin_report_list.html',
             reports=reports,
             site_name=site_name,
             slogan=slogan
