@@ -2,5 +2,5 @@ Flask
 Flask-SQLAlchemy
 Flask-WTF
 WTForms
-dotenv
+python-dotenv
 sqlitecloud
