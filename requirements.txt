@@ -1,5 +1,3 @@
 Flask
 Flask-SQLAlchemy
-python-dotenv
-SQLAlchemy
 sqlitecloud
