@@ -8,17 +8,10 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
-    # Kết nối SQLite Cloud
     connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
     conn = sqlitecloud.connect(connection_string)
 
-    # Xoá các bảng không cần thiết nếu tồn tại
     with conn:
-        conn.execute('DROP TABLE IF EXISTS ratings')
-        conn.execute('DROP TABLE IF EXISTS reviews')
-        conn.execute('DROP TABLE IF EXISTS reports')
-
-        # Tạo bảng `records` nếu chưa tồn tại
         conn.execute('''
             CREATE TABLE IF NOT EXISTS records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
