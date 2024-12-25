@@ -104,8 +104,9 @@ def create_app():
             if record and record[0] == 1:
                 flash('This record has already been approved!', 'warning')
             else:
-                conn.execute('UPDATE records SET approved = ? WHERE id = ?', (True, record_id))
-                flash('Record approved!', 'success')
+                conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
+                conn.commit()
+                flash('Record approved successfully!', 'success')
         return redirect(url_for('admin_dashboard', key="William12@OD"))
 
     @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
