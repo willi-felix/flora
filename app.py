@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from math import ceil
+from time import time
 
 def create_app():
     app = Flask(__name__)
@@ -21,20 +22,39 @@ def create_app():
                 mean TEXT NOT NULL,
                 example TEXT NOT NULL,
                 approved INTEGER DEFAULT 0,
-                search_count INTEGER DEFAULT 0
+                search_count INTEGER DEFAULT 0,
+                last_updated INTEGER DEFAULT 0
             )
         ''')
         cursor = conn.execute("PRAGMA table_info(records)")
         columns = [column[1] for column in cursor.fetchall()]
-        if 'search_count' not in columns:
-            conn.execute('ALTER TABLE records ADD COLUMN search_count INTEGER DEFAULT 0')
+        if 'last_updated' not in columns:
+            conn.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
 
     @app.route('/')
     def home():
+        with conn:
+            cursor = conn.execute(
+                'SELECT id, sentence, lang, mean, last_updated FROM records WHERE approved = 1 ORDER BY RANDOM() LIMIT 1'
+            )
+            word_of_the_day = cursor.fetchone()
+
+            if word_of_the_day:
+                last_updated = word_of_the_day[4]
+                current_time = int(time())
+
+                if current_time - last_updated >= 86400:
+                    conn.execute(
+                        'UPDATE records SET last_updated = ? WHERE id = ?',
+                        (current_time, word_of_the_day[0])
+                    )
+                    conn.commit()
+
         return render_template(
             'home.html',
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
+            word_of_the_day=word_of_the_day,
             current_year=datetime.now().year
         )
 
