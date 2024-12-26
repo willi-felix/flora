@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from fuzzywuzzy import fuzz
+from math import ceil
 
 def create_app():
     app = Flask(__name__)
@@ -60,21 +61,21 @@ def create_app():
     @app.route('/search', methods=['GET'])
     def search():
         query = request.args.get('query', '').strip()
+        page = int(request.args.get('page', 1))
         results = []
         if query:
             with conn:
                 cursor = conn.execute(
                     'SELECT sentence, lang, mean, example FROM records WHERE approved = ?',
-                    (1,)  # Only fetch approved records
+                    (1,)
                 )
                 records = cursor.fetchall()
 
-                # Using fuzzywuzzy to get approximate matches for the query
                 for row in records:
                     sentence = row[0]
-                    score = fuzz.partial_ratio(query.lower(), sentence.lower())  # Compare query to sentence
+                    score = fuzz.partial_ratio(query.lower(), sentence.lower())
 
-                    if score > 80:  # If the similarity score is above 80, consider it a match
+                    if score > 80:
                         results.append({
                             'sentence': sentence,
                             'lang': row[1],
@@ -82,10 +83,17 @@ def create_app():
                             'example': row[3]
                         })
 
+        items_per_page = 5
+        total_items = len(results)
+        total_pages = ceil(total_items / items_per_page)
+        results = results[(page - 1) * items_per_page:page * items_per_page]
+
         return render_template(
             'search_results.html',
             results=results,
             query=query,
+            page=page,
+            total_pages=total_pages,
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
             current_year=datetime.now().year
@@ -95,16 +103,24 @@ def create_app():
     def admin_dashboard():
         if request.args.get('key') != "William12@OD":
             return "Unauthorized Access", 403
+        page = int(request.args.get('page', 1))
         with conn:
             cursor = conn.execute('SELECT id, lang, sentence, approved FROM records')
             records = [
                 {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3])}
                 for row in cursor.fetchall()
             ]
+        items_per_page = 5
+        total_items = len(records)
+        total_pages = ceil(total_items / items_per_page)
+        records = records[(page - 1) * items_per_page:page * items_per_page]
+
         return render_template(
             'admin_dashboard.html',
             records=records,
-            total_records=len(records),
+            total_records=total_items,
+            total_pages=total_pages,
+            page=page,
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN']
         )
