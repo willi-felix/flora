@@ -52,5 +52,19 @@
             </tbody>
         </table>
     </div>
+
+    <div class="flex justify-between mt-6">
+        <div>
+            <span class="text-gray-600">Page {{ page }} of {{ total_pages }}</span>
+        </div>
+        <div>
+            {% if page > 1 %}
+            <a href="{{ url_for('admin_dashboard', key='William12@OD', page=page-1) }}" class="text-blue-500 hover:underline">Previous</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('admin_dashboard', key='William12@OD', page=page+1) }}" class="text-blue-500 hover:underline ml-4">Next</a>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}
