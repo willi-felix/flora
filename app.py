@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from fuzzywuzzy import fuzz
+from sentence_transformers import SentenceTransformer, util
 from math import ceil
 
 def create_app():
@@ -29,6 +30,8 @@ def create_app():
         columns = [column[1] for column in cursor.fetchall()]
         if 'search_count' not in columns:
             conn.execute('ALTER TABLE records ADD COLUMN search_count INTEGER DEFAULT 0')
+
+    model = SentenceTransformer('all-MiniLM-L6-v2')
 
     @app.route('/')
     def home():
@@ -76,21 +79,28 @@ def create_app():
                 )
                 records = cursor.fetchall()
 
-                for row in records:
-                    sentence = row[1]
-                    score = fuzz.partial_ratio(query.lower(), sentence.lower())
-                    if score > 80:
+                # Convert records to embeddings and search using SentenceTransformer
+                record_texts = [row[3] for row in records]  # Use the 'mean' field for matching
+                record_embeddings = model.encode(record_texts, convert_to_tensor=True)
+                query_embedding = model.encode(query, convert_to_tensor=True)
+
+                similarities = util.pytorch_cos_sim(query_embedding, record_embeddings)[0]
+                top_results = sorted(
+                    enumerate(similarities), key=lambda x: x[1], reverse=True
+                )
+
+                for idx, score in top_results[:10]:  # Limit to top 10 results
+                    if float(score) > 0.5:  # Only include results with sufficient similarity
+                        row = records[idx]
                         results.append({
                             'id': row[0],
-                            'sentence': sentence,
+                            'sentence': row[1],
                             'lang': row[2],
                             'mean': row[3],
                             'example': row[4],
                             'search_count': row[5],
-                            'score': score
+                            'score': float(score)
                         })
-
-            results.sort(key=lambda x: (x['search_count'], x['score']), reverse=True)
 
             items_per_page = 5
             total_items = len(results)
@@ -113,83 +123,6 @@ def create_app():
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
             current_year=datetime.now().year
-        )
-
-    @app.route('/admincp', methods=['GET', 'POST'])
-    def admin_dashboard():
-        if request.args.get('key') != "William12@OD":
-            return "Unauthorized Access", 403
-        page = int(request.args.get('page', 1))
-        with conn:
-            cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
-            records = [
-                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
-                for row in cursor.fetchall()
-            ]
-        items_per_page = 5
-        total_items = len(records)
-        total_pages = ceil(total_items / items_per_page)
-        records = records[(page - 1) * items_per_page:page * items_per_page]
-
-        return render_template(
-            'admin_dashboard.html',
-            records=records,
-            total_records=total_items,
-            total_pages=total_pages,
-            page=page,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN']
-        )
-
-    @app.route('/admincp/approve/<int:record_id>', methods=['POST'])
-    def approve_record(record_id):
-        with conn:
-            record = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,)).fetchone()
-            if record and record[0] == 1:
-                flash('This record has already been approved!', 'warning')
-            else:
-                conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
-                conn.commit()
-                flash('Record approved successfully!', 'success')
-        return redirect(url_for('admin_dashboard', key="William12@OD"))
-
-    @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
-    def delete_record(record_id):
-        with conn:
-            conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
-        flash('Record deleted!', 'success')
-        return redirect(url_for('admin_dashboard', key="William12@OD"))
-
-    @app.route('/admincp/edit/<int:record_id>', methods=['GET', 'POST'])
-    def edit_record(record_id):
-        with conn:
-            record = conn.execute('SELECT * FROM records WHERE id = ?', (record_id,)).fetchone()
-        if not record:
-            flash('Record not found!', 'danger')
-            return redirect(url_for('admin_dashboard', key="William12@OD"))
-        if request.method == 'POST':
-            lang = request.form.get('lang', '').strip()
-            sentence = request.form.get('sentence', '').strip()
-            mean = request.form.get('mean', '').strip()
-            example = request.form.get('example', '').strip()
-            if not (lang and sentence and mean and example):
-                flash('All fields are required!', 'danger')
-                return redirect(url_for('edit_record', record_id=record_id))
-            with conn:
-                conn.execute(
-                    'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
-                    (lang, sentence, mean, example, record_id)
-                )
-            flash('Record updated successfully!', 'success')
-            return redirect(url_for('admin_dashboard', key="William12@OD"))
-        return render_template(
-            'edit_record.html',
-            record={
-                'id': record[0], 'lang': record[1], 'sentence': record[2],
-                'mean': record[3], 'example': record[4], 'approved': bool(record[5])
-            },
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN']
         )
 
     return app
