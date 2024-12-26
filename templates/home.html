@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="flex flex-col justify-center items-center h-5/6 overflow-hidden bg-gradient-to-r from-blue-50 to-teal-50 fixed top-0 left-0 right-0">
-    <h2 class="text-4xl font-bold text-teal-600 mb-6">Welcome to {{ site_name }}</h2>
+<div class="flex flex-col justify-center items-center h-screen overflow-hidden bg-gradient-to-r from-blue-50 to-teal-50 fixed top-0 left-0 right-0">
+    <h2 class="text-4xl font-bold text-teal-600 mb-6">{{ site_name }}</h2>
+    <p class="text-lg text-teal-500 mb-8">{{ slogan }}</p>
+
     <form action="/search" method="get" class="w-full max-w-lg">
         <input 
             type="text" 
@@ -18,7 +20,7 @@
     </form>
 </div>
 
-<div class="mt-8 p-6 bg-white rounded-2xl shadow-lg w-full max-w-lg text-left">
+<div class="mt-8 p-6 bg-white rounded-2xl shadow-lg w-full max-w-lg text-left mx-auto">
     <h3 class="text-xl font-semibold text-teal-600 mb-4">Word by Day</h3>
     {% if word_of_the_day %}
         <p class="text-gray-700 text-lg">Word: <span class="font-bold">{{ word_of_the_day[1] }}</span></p>
