@@ -66,7 +66,6 @@ def create_app():
     def search():
         query = request.args.get('query', '').strip()
         page = int(request.args.get('page', 1))
-        search_mode = request.args.get('mode', 'definition')
         results = []
         if query:
             with conn:
@@ -76,10 +75,20 @@ def create_app():
                 )
                 records = cursor.fetchall()
 
-                if search_mode == 'definition':
-                    record_texts = [row[3] for row in records]
-                else:
-                    record_texts = [row[1] for row in records]
+                record_texts = [row[1] for row in records]
+                record_meanings = [row[3] for row in records]
+
+                for idx, sentence in enumerate(record_texts):
+                    if query.lower() in sentence.lower():
+                        row = records[idx]
+                        results.append({
+                            'id': row[0],
+                            'sentence': row[1],
+                            'lang': row[2],
+                            'mean': row[3],
+                            'example': row[4],
+                            'search_count': row[5],
+                        })
 
             items_per_page = 5
             total_items = len(results)
@@ -97,7 +106,6 @@ def create_app():
             'search_results.html',
             results=results,
             query=query,
-            search_mode=search_mode,
             page=page,
             total_pages=total_pages,
             site_name=app.config['SITE_NAME'],
