@@ -43,11 +43,12 @@ def create_app():
             if word_of_the_day:
                 last_updated = word_of_the_day[4]
                 current_time = int(time())
-
-                if current_time - last_updated >= 86400:  # 86400 seconds = 24 hours
+                utc_now = datetime.now(pytz.utc)
+                midnight = datetime(utc_now.year, utc_now.month, utc_now.day, tzinfo=pytz.utc)
+                if current_time - last_updated >= 86400:  
                     conn.execute(
                         'UPDATE records SET last_updated = ? WHERE id = ?',
-                        (current_time, word_of_the_day[0])
+                        (int(midnight.timestamp()), word_of_the_day[0])
                     )
                     conn.commit()
 
