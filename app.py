@@ -21,7 +21,8 @@ def create_app():
                 sentence TEXT NOT NULL,
                 mean TEXT NOT NULL,
                 example TEXT NOT NULL,
-                approved INTEGER DEFAULT 0
+                approved INTEGER DEFAULT 0,
+                search_count INTEGER DEFAULT 0
             )
         ''')
 
@@ -46,8 +47,8 @@ def create_app():
                 return redirect(url_for('add_record'))
             with conn:
                 conn.execute(
-                    'INSERT INTO records (lang, sentence, mean, example, approved) VALUES (?, ?, ?, ?, ?)',
-                    (lang, sentence, mean, example, 0)
+                    'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                    (lang, sentence, mean, example, 0, 0)
                 )
             flash('Record added successfully! Awaiting approval.', 'success')
             return redirect(url_for('home'))
@@ -66,27 +67,41 @@ def create_app():
         if query:
             with conn:
                 cursor = conn.execute(
-                    'SELECT sentence, lang, mean, example FROM records WHERE approved = ?',
+                    'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
                     (1,)
                 )
                 records = cursor.fetchall()
 
                 for row in records:
-                    sentence = row[0]
+                    sentence = row[1]
                     score = fuzz.partial_ratio(query.lower(), sentence.lower())
 
                     if score > 80:
                         results.append({
+                            'id': row[0],
                             'sentence': sentence,
-                            'lang': row[1],
-                            'mean': row[2],
-                            'example': row[3]
+                            'lang': row[2],
+                            'mean': row[3],
+                            'example': row[4],
+                            'search_count': row[5],
+                            'score': score
                         })
 
-        items_per_page = 5
-        total_items = len(results)
-        total_pages = ceil(total_items / items_per_page)
-        results = results[(page - 1) * items_per_page:page * items_per_page]
+            # Sort results by search count (descending) and score (descending)
+            results.sort(key=lambda x: (x['search_count'], x['score']), reverse=True)
+
+            items_per_page = 5
+            total_items = len(results)
+            total_pages = ceil(total_items / items_per_page)
+            results = results[(page - 1) * items_per_page:page * items_per_page]
+
+            # Update the search count for the most relevant record
+            if results:
+                with conn:
+                    conn.execute(
+                        'UPDATE records SET search_count = search_count + 1 WHERE id = ?',
+                        (results[0]['id'],)
+                    )
 
         return render_template(
             'search_results.html',
@@ -105,9 +120,9 @@ def create_app():
             return "Unauthorized Access", 403
         page = int(request.args.get('page', 1))
         with conn:
-            cursor = conn.execute('SELECT id, lang, sentence, approved FROM records')
+            cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
             records = [
-                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3])}
+                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
                 for row in cursor.fetchall()
             ]
         items_per_page = 5
