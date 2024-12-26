@@ -1,7 +1,6 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
-from sentence_transformers import SentenceTransformer, util
 from math import ceil
 
 def create_app():
@@ -29,8 +28,6 @@ def create_app():
         columns = [column[1] for column in cursor.fetchall()]
         if 'search_count' not in columns:
             conn.execute('ALTER TABLE records ADD COLUMN search_count INTEGER DEFAULT 0')
-
-    model = SentenceTransformer('all-MiniLM-L6-v2')
 
     @app.route('/')
     def home():
@@ -69,7 +66,7 @@ def create_app():
     def search():
         query = request.args.get('query', '').strip()
         page = int(request.args.get('page', 1))
-        search_mode = request.args.get('mode', 'definition')  # 'definition' or 'word'
+        search_mode = request.args.get('mode', 'definition')
         results = []
         if query:
             with conn:
@@ -80,30 +77,9 @@ def create_app():
                 records = cursor.fetchall()
 
                 if search_mode == 'definition':
-                    record_texts = [row[3] for row in records]  # Match against the 'mean' field
+                    record_texts = [row[3] for row in records]
                 else:
-                    record_texts = [row[1] for row in records]  # Match against the 'sentence' field
-
-                record_embeddings = model.encode(record_texts, convert_to_tensor=True)
-                query_embedding = model.encode(query, convert_to_tensor=True)
-
-                similarities = util.pytorch_cos_sim(query_embedding, record_embeddings)[0]
-                top_results = sorted(
-                    enumerate(similarities), key=lambda x: x[1], reverse=True
-                )
-
-                for idx, score in top_results[:10]:
-                    if float(score) > 0.5:
-                        row = records[idx]
-                        results.append({
-                            'id': row[0],
-                            'sentence': row[1],
-                            'lang': row[2],
-                            'mean': row[3],
-                            'example': row[4],
-                            'search_count': row[5],
-                            'score': float(score)
-                        })
+                    record_texts = [row[1] for row in records]
 
             items_per_page = 5
             total_items = len(results)
