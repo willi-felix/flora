@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from math import ceil
 from time import time
+import pytz
 
 def create_app():
     app = Flask(__name__)
@@ -43,7 +44,7 @@ def create_app():
                 last_updated = word_of_the_day[4]
                 current_time = int(time())
 
-                if current_time - last_updated >= 86400:
+                if current_time - last_updated >= 86400:  # 86400 seconds = 24 hours
                     conn.execute(
                         'UPDATE records SET last_updated = ? WHERE id = ?',
                         (current_time, word_of_the_day[0])
@@ -55,7 +56,7 @@ def create_app():
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
             word_of_the_day=word_of_the_day,
-            current_year=datetime.now().year
+            current_year=datetime.now(pytz.utc).year
         )
 
     @app.route('/add', methods=['GET', 'POST'])
@@ -79,7 +80,7 @@ def create_app():
             'add_record.html',
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
-            current_year=datetime.now().year
+            current_year=datetime.now(pytz.utc).year
         )
 
     @app.route('/search', methods=['GET'])
@@ -130,7 +131,7 @@ def create_app():
             total_pages=total_pages,
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
-            current_year=datetime.now().year
+            current_year=datetime.now(pytz.utc).year
         )
 
     @app.route('/admincp', methods=['GET', 'POST'])
