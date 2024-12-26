@@ -19,7 +19,7 @@ def create_app():
                 sentence TEXT NOT NULL,
                 mean TEXT NOT NULL,
                 example TEXT NOT NULL,
-                approved BOOLEAN DEFAULT FALSE
+                approved INTEGER DEFAULT 0
             )
         ''')
 
@@ -45,7 +45,7 @@ def create_app():
             with conn:
                 conn.execute(
                     'INSERT INTO records (lang, sentence, mean, example, approved) VALUES (?, ?, ?, ?, ?)',
-                    (lang, sentence, mean, example, False)
+                    (lang, sentence, mean, example, 0)
                 )
             flash('Record added successfully! Awaiting approval.', 'success')
             return redirect(url_for('home'))
@@ -64,7 +64,7 @@ def create_app():
             with conn:
                 cursor = conn.execute(
                     'SELECT sentence, lang, mean, example FROM records WHERE sentence LIKE ? AND approved = ?',
-                    (f'%{query}%', True)
+                    (f'%{query}%', 1)  # approved = 1 ensures that only approved records are returned
                 )
                 results = [
                     {'sentence': row[0], 'lang': row[1], 'mean': row[2], 'example': row[3]}
