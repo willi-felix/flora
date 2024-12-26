@@ -25,6 +25,10 @@ def create_app():
                 search_count INTEGER DEFAULT 0
             )
         ''')
+        cursor = conn.execute("PRAGMA table_info(records)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'search_count' not in columns:
+            conn.execute('ALTER TABLE records ADD COLUMN search_count INTEGER DEFAULT 0')
 
     @app.route('/')
     def home():
@@ -75,7 +79,6 @@ def create_app():
                 for row in records:
                     sentence = row[1]
                     score = fuzz.partial_ratio(query.lower(), sentence.lower())
-
                     if score > 80:
                         results.append({
                             'id': row[0],
@@ -87,7 +90,6 @@ def create_app():
                             'score': score
                         })
 
-            # Sort results by search count (descending) and score (descending)
             results.sort(key=lambda x: (x['search_count'], x['score']), reverse=True)
 
             items_per_page = 5
@@ -95,7 +97,6 @@ def create_app():
             total_pages = ceil(total_items / items_per_page)
             results = results[(page - 1) * items_per_page:page * items_per_page]
 
-            # Update the search count for the most relevant record
             if results:
                 with conn:
                     conn.execute(
