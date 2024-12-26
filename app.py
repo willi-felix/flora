@@ -60,6 +60,7 @@ def create_app():
     def search():
         query = request.args.get('query', '').strip()
         results = []
+        print(f"Search Query: {query}")  # Debugging output
         if query:
             with conn:
                 cursor = conn.execute(
@@ -70,6 +71,7 @@ def create_app():
                     {'sentence': row[0], 'lang': row[1], 'mean': row[2], 'example': row[3]}
                     for row in cursor.fetchall()
                 ]
+                print(f"Results: {results}")  # Debugging output
         return render_template(
             'search_results.html',
             results=results,
