@@ -34,29 +34,10 @@ def create_app():
 
     @app.route('/')
     def home():
-        with conn:
-            cursor = conn.execute(
-                'SELECT id, sentence, lang, mean, last_updated FROM records WHERE approved = 1 ORDER BY RANDOM() LIMIT 1'
-            )
-            word_of_the_day = cursor.fetchone()
-
-            if word_of_the_day:
-                last_updated = word_of_the_day[4]
-                current_time = int(time())
-                utc_now = datetime.now(pytz.utc)
-                midnight = datetime(utc_now.year, utc_now.month, utc_now.day, tzinfo=pytz.utc)
-                if current_time - last_updated >= 86400:  
-                    conn.execute(
-                        'UPDATE records SET last_updated = ? WHERE id = ?',
-                        (int(midnight.timestamp()), word_of_the_day[0])
-                    )
-                    conn.commit()
-
         return render_template(
             'home.html',
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
-            word_of_the_day=word_of_the_day,
             current_year=datetime.now(pytz.utc).year
         )
 
