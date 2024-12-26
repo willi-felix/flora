@@ -1,31 +1,37 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="flex flex-col justify-center items-center h-5/6 overflow-hidden bg-gradient-to-r from-blue-50 to-teal-50 fixed top-0 left-0 right-0">
-    <h2 class="text-4xl font-bold text-teal-600 mb-6">Welcome to {{ site_name }}</h2>
-    <form action="/search" method="get" class="w-full max-w-lg">
-        <input 
-            type="text" 
-            name="query" 
-            placeholder="Search for a sentence, phrase, or word..." 
-            class="p-4 w-full border border-gray-300 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500" 
-            required>
-        <button 
-            type="submit" 
-            class="w-full mt-4 p-3 bg-blue-500 text-white font-bold rounded-full hover:bg-blue-600 shadow-md">
-            Search
-        </button>
-    </form>
+<div class="flex flex-col justify-center items-center h-screen overflow-hidden bg-gradient-to-r from-blue-50 to-teal-50">
+    <div class="absolute top-10 w-full text-center">
+        <h2 class="text-4xl font-bold text-teal-600">{{ site_name }}</h2>
+        <p class="text-xl text-teal-500">{{ slogan }}</p>
+    </div>
+
+    <div class="flex flex-col justify-center items-center mt-24 w-full">
+        <form action="/search" method="get" class="w-full max-w-lg">
+            <input 
+                type="text" 
+                name="query" 
+                placeholder="Search for a sentence, phrase, or word..." 
+                class="p-4 w-full border border-gray-300 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500" 
+                required>
+            <button 
+                type="submit" 
+                class="w-full mt-4 p-3 bg-blue-500 text-white font-bold rounded-full hover:bg-blue-600 shadow-md">
+                Search
+            </button>
+        </form>
+    </div>
 
     {% if word_of_the_day %}
-    <div class="mt-8 p-6 bg-white rounded-2xl shadow-lg w-full max-w-lg text-center">
+    <div class="mt-8 p-6 bg-white rounded-2xl shadow-lg w-full max-w-lg text-center absolute bottom-16">
         <h3 class="text-xl font-semibold text-teal-600 mb-4">Word by Day</h3>
         <p class="text-gray-700 text-lg">Word: <span class="font-bold">{{ word_of_the_day[1] }}</span></p>
         <p class="text-gray-600">Meaning: {{ word_of_the_day[3] }}</p>
         <p class="text-gray-500 mt-2">Language: {{ word_of_the_day[2] }}</p>
     </div>
     {% else %}
-    <p class="mt-8 text-gray-600">No word available for today!</p>
+    <p class="mt-8 text-gray-600 text-center absolute bottom-16">No word available for today!</p>
     {% endif %}
 </div>
 {% endblock %}
