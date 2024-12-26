@@ -16,5 +16,16 @@
             Search
         </button>
     </form>
+
+    {% if word_of_the_day %}
+    <div class="mt-8 p-6 bg-white rounded-2xl shadow-lg w-full max-w-lg text-center">
+        <h3 class="text-xl font-semibold text-teal-600 mb-4">Word by Day</h3>
+        <p class="text-gray-700 text-lg">Word: <span class="font-bold">{{ word_of_the_day[1] }}</span></p>
+        <p class="text-gray-600">Meaning: {{ word_of_the_day[3] }}</p>
+        <p class="text-gray-500 mt-2">Language: {{ word_of_the_day[2] }}</p>
+    </div>
+    {% else %}
+    <p class="mt-8 text-gray-600">No word available for today!</p>
+    {% endif %}
 </div>
 {% endblock %}
