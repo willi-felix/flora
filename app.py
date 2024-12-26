@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
+from fuzzywuzzy import fuzz
 
 def create_app():
     app = Flask(__name__)
@@ -63,13 +64,24 @@ def create_app():
         if query:
             with conn:
                 cursor = conn.execute(
-                    'SELECT sentence, lang, mean, example FROM records WHERE sentence LIKE ? AND approved = ?',
-                    (f'%{query}%', 1)  # approved = 1 ensures that only approved records are returned
+                    'SELECT sentence, lang, mean, example FROM records WHERE approved = ?',
+                    (1,)  # Only fetch approved records
                 )
-                results = [
-                    {'sentence': row[0], 'lang': row[1], 'mean': row[2], 'example': row[3]}
-                    for row in cursor.fetchall()
-                ]
+                records = cursor.fetchall()
+
+                # Using fuzzywuzzy to get approximate matches for the query
+                for row in records:
+                    sentence = row[0]
+                    score = fuzz.partial_ratio(query.lower(), sentence.lower())  # Compare query to sentence
+
+                    if score > 80:  # If the similarity score is above 80, consider it a match
+                        results.append({
+                            'sentence': sentence,
+                            'lang': row[1],
+                            'mean': row[2],
+                            'example': row[3]
+                        })
+
         return render_template(
             'search_results.html',
             results=results,
