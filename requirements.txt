@@ -2,3 +2,4 @@ Flask
 sqlitecloud
 fuzzywuzzy
 pytz
+Flask-WTF
