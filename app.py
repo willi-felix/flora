@@ -7,15 +7,12 @@ import random
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField
 from wtforms.validators import DataRequired
-from flask_wtf.recaptcha import RecaptchaField
 
 def create_app():
     app = Flask(__name__)
     app.config['SITE_NAME'] = 'Digo'
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
-    app.config['RECAPTCHA_PUBLIC_KEY'] = '6LfNmMEpAAAAAAYdf6_Tw5iPtDZjveU5aBXe5zd5'
-    app.config['RECAPTCHA_PRIVATE_KEY'] = '6LfNmMEpAAAAADQgopL_LGEFx1lH1K-CX1GgLROm'
 
     connection_string1 = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
     connection_string2 = "sqlitecloud://cxfl3qnhhk.sqlite.cloud:8860/digo.sqlite?apikey=K0lFNDtoP9qElNFscI3UTa09ikmDvVWYCqDKw944sQo"
@@ -49,15 +46,9 @@ def create_app():
         sentence = TextAreaField('Sentence', validators=[DataRequired()])
         mean = TextAreaField('Meaning', validators=[DataRequired()])
         example = TextAreaField('Example', validators=[DataRequired()])
-        recaptcha = RecaptchaField()
 
     def choose_database():
-        with conn1, conn2:
-            cursor1 = conn1.execute('SELECT COUNT(*) FROM records')
-            cursor2 = conn2.execute('SELECT COUNT(*) FROM records')
-            count1 = cursor1.fetchone()[0]
-            count2 = cursor2.fetchone()[0]
-            return conn1 if count1 <= count2 else conn2
+        return random.choice([conn1, conn2])
 
     @app.route('/')
     def home():
@@ -95,12 +86,19 @@ def create_app():
                 flash('This record already exists in the database.', 'warning')
                 return redirect(url_for('home'))
 
-            conn = choose_database()
-            with conn:
-                conn.execute(
-                    'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
-                    (lang, sentence, mean, example, 0, 0)
-                )
+            success = False
+            while not success:
+                conn = choose_database()
+                try:
+                    with conn:
+                        conn.execute(
+                            'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                            (lang, sentence, mean, example, 0, 0)
+                        )
+                    success = True
+                except Exception:
+                    pass
+
             flash('Record added successfully! Awaiting approval.', 'success')
             return redirect(url_for('home'))
 
