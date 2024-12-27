@@ -51,6 +51,14 @@ def create_app():
         example = TextAreaField('Example', validators=[DataRequired()])
         recaptcha = RecaptchaField()
 
+    def choose_database():
+        with conn1, conn2:
+            cursor1 = conn1.execute('SELECT COUNT(*) FROM records')
+            cursor2 = conn2.execute('SELECT COUNT(*) FROM records')
+            count1 = cursor1.fetchone()[0]
+            count2 = cursor2.fetchone()[0]
+            return conn1 if count1 <= count2 else conn2
+
     @app.route('/')
     def home():
         return render_template(
@@ -72,7 +80,6 @@ def create_app():
                 flash('All fields are required!', 'danger')
                 return redirect(url_for('add_record'))
 
-            # Check for duplicate records in both databases
             duplicate_found = False
             for conn in [conn1, conn2]:
                 with conn:
@@ -88,8 +95,7 @@ def create_app():
                 flash('This record already exists in the database.', 'warning')
                 return redirect(url_for('home'))
 
-            # Randomly select a database to insert into
-            conn = random.choice([conn1, conn2])
+            conn = choose_database()
             with conn:
                 conn.execute(
                     'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
