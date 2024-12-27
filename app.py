@@ -50,30 +50,8 @@ def create_app():
         mean = TextAreaField('Meaning', validators=[DataRequired()])
         example = TextAreaField('Example', validators=[DataRequired()])
 
-    def get_db_usage_percentage(connection_string):
-        try:
-            conn = sqlitecloud.connect(connection_string)
-            with conn:
-                cursor = conn.execute("PRAGMA page_count")
-                page_count = cursor.fetchone()[0]
-                cursor = conn.execute("PRAGMA page_size")
-                page_size = cursor.fetchone()[0]
-                cursor = conn.execute("PRAGMA max_page_count")
-                max_page_count = cursor.fetchone()[0]
-                current_size = page_count * page_size
-                max_size = max_page_count * page_size
-                return (current_size / max_size) * 100
-        except Exception as e:
-            return 100
-
-    def choose_database_for_write():
-        db1_usage = get_db_usage_percentage(connection_strings[0])
-        if db1_usage < 95:
-            return conn1
-        return conn2
-
-    def choose_database_for_read():
-        return [conn1, conn2]
+    def choose_database():
+        return conn1 if conn1.get_usage()['used'] / conn1.get_usage()['max'] < 0.95 else conn2
 
     def test_connections():
         for conn in [conn1, conn2]:
@@ -116,7 +94,7 @@ def create_app():
                 flash('Record added successfully! Awaiting approval.', 'success')
                 return redirect(url_for('home'))
 
-            flash('Failed to add record to any database.', 'danger')
+            flash('Failed to add record to the database.', 'danger')
             return redirect(url_for('home'))
 
         return render_template(
@@ -128,7 +106,7 @@ def create_app():
         )
 
     def check_duplicate_record(sentence, lang):
-        for conn in choose_database_for_read():
+        for conn in [conn1, conn2]:
             with conn:
                 cursor = conn.execute(
                     'SELECT id FROM records WHERE sentence = ? AND lang = ?',
@@ -139,7 +117,7 @@ def create_app():
         return False
 
     def insert_record_to_db(lang, sentence, mean, example):
-        conn = choose_database_for_write()
+        conn = choose_database()
         try:
             with conn:
                 conn.execute(
@@ -168,7 +146,7 @@ def create_app():
         results = results[(page - 1) * items_per_page:page * items_per_page]
 
         if results:
-            conn = choose_database_for_read()[0]
+            conn = random.choice([conn1, conn2])
             with conn:
                 conn.execute(
                     'UPDATE records SET search_count = search_count + 1 WHERE id = ?',
@@ -188,7 +166,7 @@ def create_app():
 
     def search_in_databases(query):
         results = []
-        for conn in choose_database_for_read():
+        for conn in [conn1, conn2]:
             with conn:
                 cursor = conn.execute(
                     'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
@@ -233,7 +211,7 @@ def create_app():
 
     def get_records_for_admin():
         records = []
-        for conn in choose_database_for_read():
+        for conn in [conn1, conn2]:
             with conn:
                 cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
                 records.extend([
@@ -279,13 +257,14 @@ def create_app():
         return render_template(
             'edit_record.html',
             form=form,
+            record=record,
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
             current_year=datetime.now(pytz.utc).year
         )
 
     def get_record_by_id(record_id):
-        for conn in choose_database_for_read():
+        for conn in [conn1, conn2]:
             with conn:
                 cursor = conn.execute(
                     'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
@@ -303,7 +282,9 @@ def create_app():
         return None
 
     def update_record_in_db(record_id, lang, sentence, mean, example):
-        for conn in choose_database_for_read():
+        db_list = [conn1, conn2]
+        random.shuffle(db_list)
+        for conn in db_list:
             try:
                 with conn:
                     conn.execute(
@@ -320,7 +301,7 @@ def create_app():
         if not test_connections():
             return "Database connection error.", 500
 
-        for conn in choose_database_for_read():
+        for conn in [conn1, conn2]:
             try:
                 with conn:
                     conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
