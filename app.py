@@ -51,59 +51,19 @@ def create_app():
         example = TextAreaField('Example', validators=[DataRequired()])
 
     def choose_database():
-        return conn1 if conn1.get_usage()['used'] / conn1.get_usage()['max'] < 0.95 else conn2
+        usage_conn1 = conn1.get_usage()
+        usage_conn2 = conn2.get_usage()
+        if usage_conn1['used'] / usage_conn1['max'] < 0.95:
+            return conn1
+        return conn2
 
     def test_connections():
         for conn in [conn1, conn2]:
             try:
                 conn.execute('SELECT 1')
             except Exception:
-                flash(f'Database {conn} connection failed.', 'danger')
                 return False
         return True
-
-    @app.route('/')
-    def home():
-        return render_template(
-            'home.html',
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
-
-    @app.route('/add', methods=['GET', 'POST'])
-    def add_record():
-        if not test_connections():
-            return "Database connection error.", 500
-
-        form = RecordForm()
-        if form.validate_on_submit():
-            lang = form.lang.data.strip()
-            sentence = form.sentence.data.strip()
-            mean = form.mean.data.strip()
-            example = form.example.data.strip()
-            if not (lang and sentence and mean and example):
-                flash('All fields are required!', 'danger')
-                return redirect(url_for('add_record'))
-
-            if check_duplicate_record(sentence, lang):
-                flash('This record already exists in the database.', 'warning')
-                return redirect(url_for('home'))
-
-            if insert_record_to_db(lang, sentence, mean, example):
-                flash('Record added successfully! Awaiting approval.', 'success')
-                return redirect(url_for('home'))
-
-            flash('Failed to add record to the database.', 'danger')
-            return redirect(url_for('home'))
-
-        return render_template(
-            'add_record.html',
-            form=form,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
 
     def check_duplicate_record(sentence, lang):
         for conn in [conn1, conn2]:
@@ -128,42 +88,6 @@ def create_app():
         except Exception:
             return False
 
-    @app.route('/search', methods=['GET'])
-    def search():
-        if not test_connections():
-            return "Database connection error.", 500
-
-        query = request.args.get('query', '').strip()
-        page = int(request.args.get('page', 1))
-        results, total_pages = [], 0
-
-        if query:
-            results = search_in_databases(query)
-
-        items_per_page = 5
-        total_items = len(results)
-        total_pages = ceil(total_items / items_per_page)
-        results = results[(page - 1) * items_per_page:page * items_per_page]
-
-        if results:
-            conn = random.choice([conn1, conn2])
-            with conn:
-                conn.execute(
-                    'UPDATE records SET search_count = search_count + 1 WHERE id = ?',
-                    (results[0]['id'],)
-                )
-
-        return render_template(
-            'search_results.html',
-            results=results,
-            query=query,
-            page=page,
-            total_pages=total_pages,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
-
     def search_in_databases(query):
         results = []
         for conn in [conn1, conn2]:
@@ -173,7 +97,6 @@ def create_app():
                     (1,)
                 )
                 records = cursor.fetchall()
-
                 for row in records:
                     if query.lower() in row[1].lower():
                         results.append({
@@ -185,6 +108,103 @@ def create_app():
                             'search_count': row[5],
                         })
         return results
+
+    def get_record_by_id(record_id):
+        for conn in [conn1, conn2]:
+            with conn:
+                cursor = conn.execute(
+                    'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
+                    (record_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        'id': row[0],
+                        'lang': row[1],
+                        'sentence': row[2],
+                        'mean': row[3],
+                        'example': row[4]
+                    }
+        return None
+
+    def update_record_in_db(record_id, lang, sentence, mean, example):
+        db_list = [conn1, conn2]
+        random.shuffle(db_list)
+        for conn in db_list:
+            try:
+                with conn:
+                    conn.execute(
+                        'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
+                        (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
+                    )
+                return True
+            except Exception:
+                continue
+        return False
+
+    @app.route('/')
+    def home():
+        return render_template(
+            'home.html',
+            site_name=app.config['SITE_NAME'],
+            slogan=app.config['SLOGAN'],
+            current_year=datetime.now(pytz.utc).year
+        )
+
+    @app.route('/add', methods=['GET', 'POST'])
+    def add_record():
+        if not test_connections():
+            return "Database connection error.", 500
+
+        form = RecordForm()
+        if form.validate_on_submit():
+            lang = form.lang.data.strip()
+            sentence = form.sentence.data.strip()
+            mean = form.mean.data.strip()
+            example = form.example.data.strip()
+
+            if check_duplicate_record(sentence, lang):
+                flash('This record already exists in the database.', 'warning')
+                return redirect(url_for('home'))
+
+            if insert_record_to_db(lang, sentence, mean, example):
+                flash('Record added successfully! Awaiting approval.', 'success')
+                return redirect(url_for('home'))
+
+            flash('Failed to add record to the database.', 'danger')
+
+        return render_template(
+            'add_record.html',
+            form=form,
+            site_name=app.config['SITE_NAME'],
+            slogan=app.config['SLOGAN'],
+            current_year=datetime.now(pytz.utc).year
+        )
+
+    @app.route('/search', methods=['GET'])
+    def search():
+        if not test_connections():
+            return "Database connection error.", 500
+
+        query = request.args.get('query', '').strip()
+        page = int(request.args.get('page', 1))
+        results = search_in_databases(query)
+
+        items_per_page = 5
+        total_items = len(results)
+        total_pages = ceil(total_items / items_per_page)
+        results = results[(page - 1) * items_per_page:page * items_per_page]
+
+        return render_template(
+            'search_results.html',
+            results=results,
+            query=query,
+            page=page,
+            total_pages=total_pages,
+            site_name=app.config['SITE_NAME'],
+            slogan=app.config['SLOGAN'],
+            current_year=datetime.now(pytz.utc).year
+        )
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
@@ -238,16 +258,11 @@ def create_app():
             mean = form.mean.data.strip()
             example = form.example.data.strip()
 
-            if not (lang and sentence and mean and example):
-                flash('All fields are required!', 'danger')
-                return redirect(url_for('edit_record', record_id=record_id))
-
             if update_record_in_db(record_id, lang, sentence, mean, example):
                 flash('Record updated successfully!', 'success')
                 return redirect(url_for('home'))
 
             flash('Failed to update record.', 'danger')
-            return redirect(url_for('home'))
 
         form.lang.data = record['lang']
         form.sentence.data = record['sentence']
@@ -263,39 +278,6 @@ def create_app():
             current_year=datetime.now(pytz.utc).year
         )
 
-    def get_record_by_id(record_id):
-        for conn in [conn1, conn2]:
-            with conn:
-                cursor = conn.execute(
-                    'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
-                    (record_id,)
-                )
-                row = cursor.fetchone()
-                if row:
-                    return {
-                        'id': row[0],
-                        'lang': row[1],
-                        'sentence': row[2],
-                        'mean': row[3],
-                        'example': row[4]
-                    }
-        return None
-
-    def update_record_in_db(record_id, lang, sentence, mean, example):
-        db_list = [conn1, conn2]
-        random.shuffle(db_list)
-        for conn in db_list:
-            try:
-                with conn:
-                    conn.execute(
-                        'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
-                        (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
-                    )
-                return True
-            except Exception:
-                continue
-        return False
-
     @app.route('/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
         if not test_connections():
@@ -309,6 +291,7 @@ def create_app():
                     return redirect(url_for('admin_dashboard', key='William12@OD'))
             except Exception:
                 continue
+
         flash('Failed to delete record.', 'danger')
         return redirect(url_for('admin_dashboard', key='William12@OD'))
 
