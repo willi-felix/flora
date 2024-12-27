@@ -50,6 +50,20 @@ def create_app():
     def choose_database():
         return random.choice([conn1, conn2])
 
+    def test_connections():
+        try:
+            conn1.execute('SELECT 1')
+        except Exception:
+            flash('Database 1 connection failed.', 'danger')
+            return False
+
+        try:
+            conn2.execute('SELECT 1')
+        except Exception:
+            flash('Database 2 connection failed.', 'danger')
+            return False
+        return True
+
     @app.route('/')
     def home():
         return render_template(
@@ -61,6 +75,9 @@ def create_app():
 
     @app.route('/add', methods=['GET', 'POST'])
     def add_record():
+        if not test_connections():
+            return "Database connection error.", 500
+
         form = RecordForm()
         if form.validate_on_submit():
             lang = form.lang.data.strip()
@@ -86,20 +103,21 @@ def create_app():
                 flash('This record already exists in the database.', 'warning')
                 return redirect(url_for('home'))
 
-            success = False
-            while not success:
-                conn = choose_database()
+            db_list = [conn1, conn2]
+            while db_list:
+                conn = db_list.pop(0)
                 try:
                     with conn:
                         conn.execute(
                             'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
                             (lang, sentence, mean, example, 0, 0)
                         )
-                    success = True
+                    flash('Record added successfully! Awaiting approval.', 'success')
+                    return redirect(url_for('home'))
                 except Exception:
-                    pass
+                    continue
 
-            flash('Record added successfully! Awaiting approval.', 'success')
+            flash('Failed to add record to any database.', 'danger')
             return redirect(url_for('home'))
 
         return render_template(
@@ -112,9 +130,13 @@ def create_app():
 
     @app.route('/search', methods=['GET'])
     def search():
+        if not test_connections():
+            return "Database connection error.", 500
+
         query = request.args.get('query', '').strip()
         page = int(request.args.get('page', 1))
         results = []
+        total_pages = 0
         if query:
             for conn in [conn1, conn2]:
                 with conn:
@@ -186,67 +208,6 @@ def create_app():
             total_records=total_items,
             total_pages=total_pages,
             page=page,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN']
-        )
-
-    @app.route('/admincp/approve/<int:record_id>', methods=['POST'])
-    def approve_record(record_id):
-        for conn in [conn1, conn2]:
-            with conn:
-                record = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,)).fetchone()
-                if record:
-                    if record[0] == 1:
-                        flash('This record has already been approved!', 'warning')
-                        break
-                    else:
-                        conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
-                        conn.commit()
-                        flash('Record approved successfully!', 'success')
-                        break
-        return redirect(url_for('admin_dashboard', key="William12@OD"))
-
-    @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
-    def delete_record(record_id):
-        for conn in [conn1, conn2]:
-            with conn:
-                conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
-        flash('Record deleted!', 'success')
-        return redirect(url_for('admin_dashboard', key="William12@OD"))
-
-    @app.route('/admincp/edit/<int:record_id>', methods=['GET', 'POST'])
-    def edit_record(record_id):
-        record = None
-        for conn in [conn1, conn2]:
-            with conn:
-                record = conn.execute('SELECT * FROM records WHERE id = ?', (record_id,)).fetchone()
-                if record:
-                    break
-        if not record:
-            flash('Record not found!', 'danger')
-            return redirect(url_for('admin_dashboard', key="William12@OD"))
-        if request.method == 'POST':
-            lang = request.form.get('lang', '').strip()
-            sentence = request.form.get('sentence', '').strip()
-            mean = request.form.get('mean', '').strip()
-            example = request.form.get('example', '').strip()
-            if not (lang and sentence and mean and example):
-                flash('All fields are required!', 'danger')
-                return redirect(url_for('edit_record', record_id=record_id))
-            for conn in [conn1, conn2]:
-                with conn:
-                    conn.execute(
-                        'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
-                        (lang, sentence, mean, example, record_id)
-                    )
-            flash('Record updated successfully!', 'success')
-            return redirect(url_for('admin_dashboard', key="William12@OD"))
-        return render_template(
-            'edit_record.html',
-            record={
-                'id': record[0], 'lang': record[1], 'sentence': record[2],
-                'mean': record[3], 'example': record[4], 'approved': bool(record[5])
-            },
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN']
         )
