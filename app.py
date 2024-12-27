@@ -2,7 +2,6 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from math import ceil
-from time import time
 import pytz
 import random
 from flask_wtf import FlaskForm
@@ -72,6 +71,24 @@ def create_app():
             if not (lang and sentence and mean and example):
                 flash('All fields are required!', 'danger')
                 return redirect(url_for('add_record'))
+
+            # Check for duplicate records in both databases
+            duplicate_found = False
+            for conn in [conn1, conn2]:
+                with conn:
+                    cursor = conn.execute(
+                        'SELECT id FROM records WHERE sentence = ? AND lang = ?',
+                        (sentence, lang)
+                    )
+                    if cursor.fetchone():
+                        duplicate_found = True
+                        break
+
+            if duplicate_found:
+                flash('This record already exists in the database.', 'warning')
+                return redirect(url_for('home'))
+
+            # Randomly select a database to insert into
             conn = random.choice([conn1, conn2])
             with conn:
                 conn.execute(
@@ -80,6 +97,7 @@ def create_app():
                 )
             flash('Record added successfully! Awaiting approval.', 'success')
             return redirect(url_for('home'))
+
         return render_template(
             'add_record.html',
             form=form,
@@ -103,7 +121,6 @@ def create_app():
                     records = cursor.fetchall()
 
                     record_texts = [row[1] for row in records]
-                    record_meanings = [row[3] for row in records]
 
                     for idx, sentence in enumerate(record_texts):
                         if query.lower() in sentence.lower():
