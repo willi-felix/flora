@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from math import ceil
 from time import time
 import pytz
+import random
 
 def create_app():
     app = Flask(__name__)
@@ -11,26 +12,32 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
-    connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
-    conn = sqlitecloud.connect(connection_string)
+    connection_string1 = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
+    connection_string2 = "sqlitecloud://cxfl3qnhhk.sqlite.cloud:8860/digo.sqlite?apikey=K0lFNDtoP9qElNFscI3UTa09ikmDvVWYCqDKw944sQo"
+    conn1 = sqlitecloud.connect(connection_string1)
+    conn2 = sqlitecloud.connect(connection_string2)
 
-    with conn:
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                lang TEXT NOT NULL,
-                sentence TEXT NOT NULL,
-                mean TEXT NOT NULL,
-                example TEXT NOT NULL,
-                approved INTEGER DEFAULT 0,
-                search_count INTEGER DEFAULT 0,
-                last_updated INTEGER DEFAULT 0
-            )
-        ''')
-        cursor = conn.execute("PRAGMA table_info(records)")
-        columns = [column[1] for column in cursor.fetchall()]
-        if 'last_updated' not in columns:
-            conn.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
+    def create_tables(connection):
+        with connection:
+            connection.execute('''
+                CREATE TABLE IF NOT EXISTS records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    lang TEXT NOT NULL,
+                    sentence TEXT NOT NULL,
+                    mean TEXT NOT NULL,
+                    example TEXT NOT NULL,
+                    approved INTEGER DEFAULT 0,
+                    search_count INTEGER DEFAULT 0,
+                    last_updated INTEGER DEFAULT 0
+                )
+            ''')
+            cursor = connection.execute("PRAGMA table_info(records)")
+            columns = [column[1] for column in cursor.fetchall()]
+            if 'last_updated' not in columns:
+                connection.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
+
+    create_tables(conn1)
+    create_tables(conn2)
 
     @app.route('/')
     def home():
@@ -51,6 +58,7 @@ def create_app():
             if not (lang and sentence and mean and example):
                 flash('All fields are required!', 'danger')
                 return redirect(url_for('add_record'))
+            conn = random.choice([conn1, conn2])
             with conn:
                 conn.execute(
                     'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
@@ -71,27 +79,28 @@ def create_app():
         page = int(request.args.get('page', 1))
         results = []
         if query:
-            with conn:
-                cursor = conn.execute(
-                    'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
-                    (1,)
-                )
-                records = cursor.fetchall()
+            for conn in [conn1, conn2]:
+                with conn:
+                    cursor = conn.execute(
+                        'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
+                        (1,)
+                    )
+                    records = cursor.fetchall()
 
-                record_texts = [row[1] for row in records]
-                record_meanings = [row[3] for row in records]
+                    record_texts = [row[1] for row in records]
+                    record_meanings = [row[3] for row in records]
 
-                for idx, sentence in enumerate(record_texts):
-                    if query.lower() in sentence.lower():
-                        row = records[idx]
-                        results.append({
-                            'id': row[0],
-                            'sentence': row[1],
-                            'lang': row[2],
-                            'mean': row[3],
-                            'example': row[4],
-                            'search_count': row[5],
-                        })
+                    for idx, sentence in enumerate(record_texts):
+                        if query.lower() in sentence.lower():
+                            row = records[idx]
+                            results.append({
+                                'id': row[0],
+                                'sentence': row[1],
+                                'lang': row[2],
+                                'mean': row[3],
+                                'example': row[4],
+                                'search_count': row[5],
+                            })
 
             items_per_page = 5
             total_items = len(results)
@@ -99,6 +108,7 @@ def create_app():
             results = results[(page - 1) * items_per_page:page * items_per_page]
 
             if results:
+                conn = random.choice([conn1, conn2])
                 with conn:
                     conn.execute(
                         'UPDATE records SET search_count = search_count + 1 WHERE id = ?',
@@ -121,12 +131,14 @@ def create_app():
         if request.args.get('key') != "William12@OD":
             return "Unauthorized Access", 403
         page = int(request.args.get('page', 1))
-        with conn:
-            cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
-            records = [
-                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
-                for row in cursor.fetchall()
-            ]
+        records = []
+        for conn in [conn1, conn2]:
+            with conn:
+                cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
+                records.extend([
+                    {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
+                    for row in cursor.fetchall()
+                ])
         items_per_page = 5
         total_items = len(records)
         total_pages = ceil(total_items / items_per_page)
@@ -144,27 +156,36 @@ def create_app():
 
     @app.route('/admincp/approve/<int:record_id>', methods=['POST'])
     def approve_record(record_id):
-        with conn:
-            record = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,)).fetchone()
-            if record and record[0] == 1:
-                flash('This record has already been approved!', 'warning')
-            else:
-                conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
-                conn.commit()
-                flash('Record approved successfully!', 'success')
+        for conn in [conn1, conn2]:
+            with conn:
+                record = conn.execute('SELECT approved FROM records WHERE id = ?', (record_id,)).fetchone()
+                if record:
+                    if record[0] == 1:
+                        flash('This record has already been approved!', 'warning')
+                        break
+                    else:
+                        conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
+                        conn.commit()
+                        flash('Record approved successfully!', 'success')
+                        break
         return redirect(url_for('admin_dashboard', key="William12@OD"))
 
     @app.route('/admincp/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
-        with conn:
-            conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
+        for conn in [conn1, conn2]:
+            with conn:
+                conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
         flash('Record deleted!', 'success')
         return redirect(url_for('admin_dashboard', key="William12@OD"))
 
     @app.route('/admincp/edit/<int:record_id>', methods=['GET', 'POST'])
     def edit_record(record_id):
-        with conn:
-            record = conn.execute('SELECT * FROM records WHERE id = ?', (record_id,)).fetchone()
+        record = None
+        for conn in [conn1, conn2]:
+            with conn:
+                record = conn.execute('SELECT * FROM records WHERE id = ?', (record_id,)).fetchone()
+                if record:
+                    break
         if not record:
             flash('Record not found!', 'danger')
             return redirect(url_for('admin_dashboard', key="William12@OD"))
@@ -176,11 +197,12 @@ def create_app():
             if not (lang and sentence and mean and example):
                 flash('All fields are required!', 'danger')
                 return redirect(url_for('edit_record', record_id=record_id))
-            with conn:
-                conn.execute(
-                    'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
-                    (lang, sentence, mean, example, record_id)
-                )
+            for conn in [conn1, conn2]:
+                with conn:
+                    conn.execute(
+                        'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
+                        (lang, sentence, mean, example, record_id)
+                    )
             flash('Record updated successfully!', 'success')
             return redirect(url_for('admin_dashboard', key="William12@OD"))
         return render_template(
