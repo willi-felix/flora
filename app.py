@@ -118,7 +118,7 @@ def create_app():
 
     def insert_record_to_db(lang, sentence, mean, example):
         db_list = [conn1, conn2]
-        random.shuffle(db_list)  # Shuffle to randomize database insertion order
+        random.shuffle(db_list)
         for conn in db_list:
             try:
                 with conn:
@@ -297,6 +297,22 @@ def create_app():
             except Exception:
                 continue
         return False
+
+    @app.route('/delete/<int:record_id>', methods=['POST'])
+    def delete_record(record_id):
+        if not test_connections():
+            return "Database connection error.", 500
+
+        for conn in [conn1, conn2]:
+            try:
+                with conn:
+                    conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
+                    flash('Record deleted successfully.', 'success')
+                    return redirect(url_for('admin_dashboard', key='William12@OD'))
+            except Exception:
+                continue
+        flash('Failed to delete record.', 'danger')
+        return redirect(url_for('admin_dashboard', key='William12@OD'))
 
     return app
 
