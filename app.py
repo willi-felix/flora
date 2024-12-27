@@ -5,12 +5,18 @@ from math import ceil
 from time import time
 import pytz
 import random
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField
+from wtforms.validators import DataRequired
+from flask_wtf.recaptcha import RecaptchaField
 
 def create_app():
     app = Flask(__name__)
     app.config['SITE_NAME'] = 'Digo'
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
+    app.config['RECAPTCHA_PUBLIC_KEY'] = '6LfNmMEpAAAAAAYdf6_Tw5iPtDZjveU5aBXe5zd5'
+    app.config['RECAPTCHA_PRIVATE_KEY'] = '6LfNmMEpAAAAADQgopL_LGEFx1lH1K-CX1GgLROm'
 
     connection_string1 = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
     connection_string2 = "sqlitecloud://cxfl3qnhhk.sqlite.cloud:8860/digo.sqlite?apikey=K0lFNDtoP9qElNFscI3UTa09ikmDvVWYCqDKw944sQo"
@@ -39,6 +45,13 @@ def create_app():
     create_tables(conn1)
     create_tables(conn2)
 
+    class RecordForm(FlaskForm):
+        lang = StringField('Language', validators=[DataRequired()])
+        sentence = TextAreaField('Sentence', validators=[DataRequired()])
+        mean = TextAreaField('Meaning', validators=[DataRequired()])
+        example = TextAreaField('Example', validators=[DataRequired()])
+        recaptcha = RecaptchaField()
+
     @app.route('/')
     def home():
         return render_template(
@@ -50,11 +63,12 @@ def create_app():
 
     @app.route('/add', methods=['GET', 'POST'])
     def add_record():
-        if request.method == 'POST':
-            lang = request.form.get('lang', '').strip()
-            sentence = request.form.get('sentence', '').strip()
-            mean = request.form.get('mean', '').strip()
-            example = request.form.get('example', '').strip()
+        form = RecordForm()
+        if form.validate_on_submit():
+            lang = form.lang.data.strip()
+            sentence = form.sentence.data.strip()
+            mean = form.mean.data.strip()
+            example = form.example.data.strip()
             if not (lang and sentence and mean and example):
                 flash('All fields are required!', 'danger')
                 return redirect(url_for('add_record'))
@@ -68,6 +82,7 @@ def create_app():
             return redirect(url_for('home'))
         return render_template(
             'add_record.html',
+            form=form,
             site_name=app.config['SITE_NAME'],
             slogan=app.config['SLOGAN'],
             current_year=datetime.now(pytz.utc).year
