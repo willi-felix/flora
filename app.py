@@ -1,6 +1,6 @@
+import sqlitecloud
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
-import sqlitecloud
 from math import ceil
 import pytz
 from flask_wtf import FlaskForm
@@ -13,14 +13,17 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
-    connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
+    db_url = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
 
-    def get_db_connection():
-        try:
-            conn = sqlitecloud.connect(connection_string)
-            return conn
-        except Exception:
-            return None
+    def get_db_connection(retries=3):
+        attempt = 0
+        while attempt < retries:
+            try:
+                conn = sqlitecloud.connect(db_url)
+                return conn
+            except Exception:
+                attempt += 1
+        return None
 
     def ensure_table_columns():
         conn = get_db_connection()
@@ -28,9 +31,7 @@ def create_app():
             cursor = conn.cursor()
             cursor.execute('PRAGMA table_info(records);')
             existing_columns = [column[1] for column in cursor.fetchall()]
-            if 'last_updated' in existing_columns:
-                cursor.execute('ALTER TABLE records DROP COLUMN last_updated')
-            conn.commit()
+            conn.close()
 
     def create_tables():
         conn = get_db_connection()
@@ -47,7 +48,7 @@ def create_app():
                     search_count INTEGER DEFAULT 0
                 )
             ''')
-            conn.commit()
+            conn.close()
             ensure_table_columns()
 
     create_tables()
@@ -65,27 +66,23 @@ def create_app():
                 'SELECT id FROM records WHERE sentence = ? AND lang = ?',
                 (sentence, lang)
             )
-            return cursor.fetchone() is not None
+            result = cursor.fetchone()
+            conn.close()
+            return result is not None
         return False
 
     def insert_record_to_db(lang, sentence, mean, example):
-        retries = 3
-        for attempt in range(retries):
-            conn = get_db_connection()
-            if conn:
-                try:
-                    conn.execute(
-                        'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
-                        (lang, sentence, mean, example, 0, 0)
-                    )
-                    conn.commit()
-                    conn.close()
-                    return True
-                except Exception:
-                    if attempt < retries - 1:
-                        continue
-                    else:
-                        return False
+        conn = get_db_connection()
+        if conn:
+            try:
+                conn.execute(
+                    'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                    (lang, sentence, mean, example, 0, 0)
+                )
+                conn.close()
+                return True
+            except Exception:
+                conn.close()
         return False
 
     def search_in_databases(query):
@@ -137,11 +134,10 @@ def create_app():
                     'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
                     (lang, sentence, mean, example, record_id)
                 )
-                conn.commit()
                 conn.close()
                 return True
             except Exception:
-                return False
+                conn.close()
         return False
 
     def get_records_for_admin():
@@ -167,9 +163,6 @@ def create_app():
 
     @app.route('/add', methods=['GET', 'POST'])
     def add_record():
-        if not test_connections():
-            return "Database connection error.", 500
-
         form = RecordForm()
         if form.validate_on_submit():
             lang = form.lang.data.strip()
@@ -195,9 +188,6 @@ def create_app():
 
     @app.route('/search', methods=['GET'])
     def search():
-        if not test_connections():
-            return "Database connection error.", 500
-
         query = request.args.get('query', '').strip()
         page = int(request.args.get('page', 1))
         results = search_in_databases(query)
@@ -243,9 +233,6 @@ def create_app():
 
     @app.route('/edit/<int:record_id>', methods=['GET', 'POST'])
     def edit_record(record_id):
-        if not test_connections():
-            return "Database connection error.", 500
-
         record = get_record_by_id(record_id)
         if not record:
             flash('Record not found.', 'danger')
@@ -279,13 +266,9 @@ def create_app():
 
     @app.route('/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
-        if not test_connections():
-            return "Database connection error.", 500
-
         try:
             conn = get_db_connection()
             conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
-            conn.commit()
             conn.close()
             flash('Record deleted successfully.', 'success')
             return redirect(url_for('admin_dashboard', key='William12@OD'))
@@ -295,13 +278,9 @@ def create_app():
 
     @app.route('/approve/<int:record_id>', methods=['POST'])
     def approve_record(record_id):
-        if not test_connections():
-            return "Database connection error.", 500
-
         try:
             conn = get_db_connection()
             conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
-            conn.commit()
             conn.close()
             flash('Record approved successfully.', 'success')
         except Exception:
