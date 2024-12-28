@@ -17,8 +17,16 @@ def create_app():
 
     def get_db_connection():
         conn = sqlitecloud.connect(connection_string)
-        conn.row_factory = sqlitecloud.Row
         return conn
+
+    def ensure_table_columns():
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('PRAGMA table_info(records);')
+        existing_columns = [column[1] for column in cursor.fetchall()]
+        if 'last_updated' in existing_columns:
+            cursor.execute('ALTER TABLE records DROP COLUMN last_updated')
+        conn.commit()
 
     def create_tables():
         conn = get_db_connection()
@@ -31,16 +39,11 @@ def create_app():
                 mean TEXT NOT NULL,
                 example TEXT NOT NULL,
                 approved INTEGER DEFAULT 0,
-                search_count INTEGER DEFAULT 0,
-                last_updated INTEGER DEFAULT 0
+                search_count INTEGER DEFAULT 0
             )
         ''')
         conn.commit()
-        cursor.execute("PRAGMA table_info(records)")
-        columns = [column[1] for column in cursor.fetchall()]
-        if 'last_updated' not in columns:
-            cursor.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
-        conn.commit()
+        ensure_table_columns()
 
     create_tables()
 
@@ -129,8 +132,8 @@ def create_app():
         try:
             conn = get_db_connection()
             conn.execute(
-                'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
-                (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
+                'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
+                (lang, sentence, mean, example, record_id)
             )
             conn.commit()
             conn.close()
