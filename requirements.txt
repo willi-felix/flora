@@ -1,5 +1,5 @@
 Flask
-sqlitecloud
+libsql
 fuzzywuzzy
 pytz
 Flask-WTF
