@@ -7,6 +7,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField
 from wtforms.validators import DataRequired
 
+
 def create_app():
     app = Flask(__name__)
     app.config['SITE_NAME'] = 'Digo'
@@ -289,6 +290,7 @@ def create_app():
         return redirect(url_for('admin_dashboard', key='William12@OD'))
 
     return app
+
 
 app = create_app()
 
