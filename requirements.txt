@@ -1,5 +1,5 @@
 Flask
-libsql
+libsql_experimental
 fuzzywuzzy
 pytz
 Flask-WTF
