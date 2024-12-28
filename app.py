@@ -59,15 +59,22 @@ def create_app():
             return cursor.fetchone() is not None
 
     def insert_record_to_db(lang, sentence, mean, example):
-        try:
-            with conn1:
-                conn1.execute(
-                    'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
-                    (lang, sentence, mean, example, 0, 0)
-                )
-            return True
-        except Exception:
-            return False
+        retries = 3
+        for attempt in range(retries):
+            try:
+                with conn1:
+                    conn1.execute(
+                        'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                        (lang, sentence, mean, example, 0, 0)
+                    )
+                return True
+            except Exception as e:
+                if attempt < retries - 1:
+                    continue
+                else:
+                    flash(f'Error adding record: {str(e)}. Please try again later.', 'danger')
+                    return False
+        return False
 
     def search_in_databases(query):
         results = []
