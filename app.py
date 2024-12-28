@@ -16,34 +16,39 @@ def create_app():
     connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
 
     def get_db_connection():
-        conn = sqlitecloud.connect(connection_string)
-        return conn
+        try:
+            conn = sqlitecloud.connect(connection_string)
+            return conn
+        except Exception:
+            return None
 
     def ensure_table_columns():
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('PRAGMA table_info(records);')
-        existing_columns = [column[1] for column in cursor.fetchall()]
-        if 'last_updated' in existing_columns:
-            cursor.execute('ALTER TABLE records DROP COLUMN last_updated')
-        conn.commit()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute('PRAGMA table_info(records);')
+            existing_columns = [column[1] for column in cursor.fetchall()]
+            if 'last_updated' in existing_columns:
+                cursor.execute('ALTER TABLE records DROP COLUMN last_updated')
+            conn.commit()
 
     def create_tables():
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                lang TEXT NOT NULL,
-                sentence TEXT NOT NULL,
-                mean TEXT NOT NULL,
-                example TEXT NOT NULL,
-                approved INTEGER DEFAULT 0,
-                search_count INTEGER DEFAULT 0
-            )
-        ''')
-        conn.commit()
-        ensure_table_columns()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    lang TEXT NOT NULL,
+                    sentence TEXT NOT NULL,
+                    mean TEXT NOT NULL,
+                    example TEXT NOT NULL,
+                    approved INTEGER DEFAULT 0,
+                    search_count INTEGER DEFAULT 0
+                )
+            ''')
+            conn.commit()
+            ensure_table_columns()
 
     create_tables()
 
@@ -53,103 +58,102 @@ def create_app():
         mean = TextAreaField('Meaning', validators=[DataRequired()])
         example = TextAreaField('Example', validators=[DataRequired()])
 
-    def test_connections():
-        try:
-            conn = get_db_connection()
-            conn.execute('SELECT 1')
-            conn.close()
-            return True
-        except Exception:
-            return False
-
     def check_duplicate_record(sentence, lang):
         conn = get_db_connection()
-        cursor = conn.execute(
-            'SELECT id FROM records WHERE sentence = ? AND lang = ?',
-            (sentence, lang)
-        )
-        return cursor.fetchone() is not None
+        if conn:
+            cursor = conn.execute(
+                'SELECT id FROM records WHERE sentence = ? AND lang = ?',
+                (sentence, lang)
+            )
+            return cursor.fetchone() is not None
+        return False
 
     def insert_record_to_db(lang, sentence, mean, example):
         retries = 3
         for attempt in range(retries):
-            try:
-                conn = get_db_connection()
-                conn.execute(
-                    'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
-                    (lang, sentence, mean, example, 0, 0)
-                )
-                conn.commit()
-                conn.close()
-                return True
-            except Exception:
-                if attempt < retries - 1:
-                    continue
-                else:
-                    return False
+            conn = get_db_connection()
+            if conn:
+                try:
+                    conn.execute(
+                        'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                        (lang, sentence, mean, example, 0, 0)
+                    )
+                    conn.commit()
+                    conn.close()
+                    return True
+                except Exception:
+                    if attempt < retries - 1:
+                        continue
+                    else:
+                        return False
         return False
 
     def search_in_databases(query):
         results = []
         conn = get_db_connection()
-        cursor = conn.execute(
-            'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
-            (1,)
-        )
-        records = cursor.fetchall()
-        for row in records:
-            if query.lower() in row['sentence'].lower():
-                results.append({
-                    'id': row['id'],
-                    'sentence': row['sentence'],
-                    'lang': row['lang'],
-                    'mean': row['mean'],
-                    'example': row['example'],
-                    'search_count': row['search_count'],
-                })
-        conn.close()
+        if conn:
+            cursor = conn.execute(
+                'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
+                (1,)
+            )
+            records = cursor.fetchall()
+            for row in records:
+                if query.lower() in row['sentence'].lower():
+                    results.append({
+                        'id': row['id'],
+                        'sentence': row['sentence'],
+                        'lang': row['lang'],
+                        'mean': row['mean'],
+                        'example': row['example'],
+                        'search_count': row['search_count'],
+                    })
+            conn.close()
         return results
 
     def get_record_by_id(record_id):
         conn = get_db_connection()
-        cursor = conn.execute(
-            'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
-            (record_id,)
-        )
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return {
-                'id': row['id'],
-                'lang': row['lang'],
-                'sentence': row['sentence'],
-                'mean': row['mean'],
-                'example': row['example']
-            }
+        if conn:
+            cursor = conn.execute(
+                'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
+                (record_id,)
+            )
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {
+                    'id': row['id'],
+                    'lang': row['lang'],
+                    'sentence': row['sentence'],
+                    'mean': row['mean'],
+                    'example': row['example']
+                }
         return None
 
     def update_record_in_db(record_id, lang, sentence, mean, example):
-        try:
-            conn = get_db_connection()
-            conn.execute(
-                'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
-                (lang, sentence, mean, example, record_id)
-            )
-            conn.commit()
-            conn.close()
-            return True
-        except Exception:
-            return False
+        conn = get_db_connection()
+        if conn:
+            try:
+                conn.execute(
+                    'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
+                    (lang, sentence, mean, example, record_id)
+                )
+                conn.commit()
+                conn.close()
+                return True
+            except Exception:
+                return False
+        return False
 
     def get_records_for_admin():
         records = []
         conn = get_db_connection()
-        cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
-        records.extend([
-            {'id': row['id'], 'lang': row['lang'], 'sentence': row['sentence'], 'approved': bool(row['approved']), 'search_count': row['search_count']}
-            for row in cursor.fetchall()
-        ])
-        conn.close()
+        if conn:
+            cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
+            records.extend([
+                {'id': row['id'], 'lang': row['lang'], 'sentence': row['sentence'], 'approved': bool(row['approved']), 'search_count': row['search_count']}
+                for row in cursor.fetchall()
+            ])
+            conn.close()
         return records
 
     @app.route('/')
