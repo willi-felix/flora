@@ -17,6 +17,7 @@ def create_app():
     
     def get_db_connection():
         conn = sqlitecloud.connect(connection_string)
+        conn.row_factory = sqlitecloud.Row
         return conn
 
     def create_tables():
