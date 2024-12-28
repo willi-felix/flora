@@ -3,7 +3,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlitecloud
 from math import ceil
 import pytz
-import random
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField
 from wtforms.validators import DataRequired
@@ -14,13 +13,8 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
-    connection_strings = [
-        "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE",
-        "sqlitecloud://cxfl3qnhhk.sqlite.cloud:8860/digo.sqlite?apikey=K0lFNDtoP9qElNFscI3UTa09ikmDvVWYCqDKw944sQo"
-    ]
-
-    conn1 = sqlitecloud.connect(connection_strings[0])
-    conn2 = sqlitecloud.connect(connection_strings[1])
+    connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
+    conn1 = sqlitecloud.connect(connection_string)
 
     def create_tables(connection):
         with connection:
@@ -42,7 +36,6 @@ def create_app():
                 connection.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
 
     create_tables(conn1)
-    create_tables(conn2)
 
     class RecordForm(FlaskForm):
         lang = StringField('Language', validators=[DataRequired()])
@@ -50,37 +43,25 @@ def create_app():
         mean = TextAreaField('Meaning', validators=[DataRequired()])
         example = TextAreaField('Example', validators=[DataRequired()])
 
-    def choose_database():
-        usage_conn1 = conn1.get_usage()
-        usage_conn2 = conn2.get_usage()
-        if usage_conn1['used'] / usage_conn1['max'] < 0.95:
-            return conn1
-        return conn2
-
     def test_connections():
-        for conn in [conn1, conn2]:
-            try:
-                conn.execute('SELECT 1')
-            except Exception:
-                return False
-        return True
+        try:
+            conn1.execute('SELECT 1')
+            return True
+        except Exception:
+            return False
 
     def check_duplicate_record(sentence, lang):
-        for conn in [conn1, conn2]:
-            with conn:
-                cursor = conn.execute(
-                    'SELECT id FROM records WHERE sentence = ? AND lang = ?',
-                    (sentence, lang)
-                )
-                if cursor.fetchone():
-                    return True
-        return False
+        with conn1:
+            cursor = conn1.execute(
+                'SELECT id FROM records WHERE sentence = ? AND lang = ?',
+                (sentence, lang)
+            )
+            return cursor.fetchone() is not None
 
     def insert_record_to_db(lang, sentence, mean, example):
-        conn = choose_database()
         try:
-            with conn:
-                conn.execute(
+            with conn1:
+                conn1.execute(
                     'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
                     (lang, sentence, mean, example, 0, 0)
                 )
@@ -90,57 +71,61 @@ def create_app():
 
     def search_in_databases(query):
         results = []
-        for conn in [conn1, conn2]:
-            with conn:
-                cursor = conn.execute(
-                    'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
-                    (1,)
-                )
-                records = cursor.fetchall()
-                for row in records:
-                    if query.lower() in row[1].lower():
-                        results.append({
-                            'id': row[0],
-                            'sentence': row[1],
-                            'lang': row[2],
-                            'mean': row[3],
-                            'example': row[4],
-                            'search_count': row[5],
-                        })
+        with conn1:
+            cursor = conn1.execute(
+                'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
+                (1,)
+            )
+            records = cursor.fetchall()
+            for row in records:
+                if query.lower() in row[1].lower():
+                    results.append({
+                        'id': row[0],
+                        'sentence': row[1],
+                        'lang': row[2],
+                        'mean': row[3],
+                        'example': row[4],
+                        'search_count': row[5],
+                    })
         return results
 
     def get_record_by_id(record_id):
-        for conn in [conn1, conn2]:
-            with conn:
-                cursor = conn.execute(
-                    'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
-                    (record_id,)
-                )
-                row = cursor.fetchone()
-                if row:
-                    return {
-                        'id': row[0],
-                        'lang': row[1],
-                        'sentence': row[2],
-                        'mean': row[3],
-                        'example': row[4]
-                    }
+        with conn1:
+            cursor = conn1.execute(
+                'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
+                (record_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'lang': row[1],
+                    'sentence': row[2],
+                    'mean': row[3],
+                    'example': row[4]
+                }
         return None
 
     def update_record_in_db(record_id, lang, sentence, mean, example):
-        db_list = [conn1, conn2]
-        random.shuffle(db_list)
-        for conn in db_list:
-            try:
-                with conn:
-                    conn.execute(
-                        'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
-                        (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
-                    )
-                return True
-            except Exception:
-                continue
-        return False
+        try:
+            with conn1:
+                conn1.execute(
+                    'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
+                    (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
+                )
+            return True
+        except Exception:
+            return False
+
+    def get_records_for_admin():
+        records = []
+        with conn1:
+            cursor = conn1.execute('SELECT id, lang, sentence, approved, search_count FROM records')
+            records.extend([
+                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
+                for row in cursor.fetchall()
+            ])
+        return records
 
     @app.route('/')
     def home():
@@ -229,17 +214,6 @@ def create_app():
             slogan=app.config['SLOGAN']
         )
 
-    def get_records_for_admin():
-        records = []
-        for conn in [conn1, conn2]:
-            with conn:
-                cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
-                records.extend([
-                    {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
-                    for row in cursor.fetchall()
-                ])
-        return records
-
     @app.route('/edit/<int:record_id>', methods=['GET', 'POST'])
     def edit_record(record_id):
         if not test_connections():
@@ -283,17 +257,14 @@ def create_app():
         if not test_connections():
             return "Database connection error.", 500
 
-        for conn in [conn1, conn2]:
-            try:
-                with conn:
-                    conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
-                    flash('Record deleted successfully.', 'success')
-                    return redirect(url_for('admin_dashboard', key='William12@OD'))
-            except Exception:
-                continue
-
-        flash('Failed to delete record.', 'danger')
-        return redirect(url_for('admin_dashboard', key='William12@OD'))
+        try:
+            with conn1:
+                conn1.execute('DELETE FROM records WHERE id = ?', (record_id,))
+                flash('Record deleted successfully.', 'success')
+                return redirect(url_for('admin_dashboard', key='William12@OD'))
+        except Exception:
+            flash('Failed to delete record.', 'danger')
+            return redirect(url_for('admin_dashboard', key='William12@OD'))
 
     return app
 
