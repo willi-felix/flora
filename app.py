@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
-import libsql_experimental as libsql
+import sqlite3
 from math import ceil
 import pytz
 from flask_wtf import FlaskForm
@@ -13,11 +13,17 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
-    connection_string = "libsql://digo-minyoongi.aws-us-west-2.turso.io?auth_token=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3MzUzNjk5NDcsImlkIjoiMzExN2U2YjItODMyMi00ZmY2LThjNjMtOGNiODI0ZmQ1MTMzIn0.-WQhTc4cwZORMh0kPyVXEw99IM0vxWB_LTCgyBopsrV5MXQVQve8DsPwjoPu7hoH3QJ6MY5osR6g91FKHTShAA"
-    conn1 = libsql.connect(connection_string)
+    connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
+    
+    def get_db_connection():
+        conn = sqlite3.connect(connection_string)
+        conn.row_factory = sqlite3.Row
+        return conn
 
-    def create_tables(connection):
-        connection.execute('''
+    def create_tables():
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 lang TEXT NOT NULL,
@@ -29,12 +35,14 @@ def create_app():
                 last_updated INTEGER DEFAULT 0
             )
         ''')
-        cursor = connection.execute("PRAGMA table_info(records)")
+        conn.commit()
+        cursor.execute("PRAGMA table_info(records)")
         columns = [column[1] for column in cursor.fetchall()]
         if 'last_updated' not in columns:
-            connection.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
+            cursor.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
+        conn.commit()
 
-    create_tables(conn1)
+    create_tables()
 
     class RecordForm(FlaskForm):
         lang = StringField('Language', validators=[DataRequired()])
@@ -44,13 +52,16 @@ def create_app():
 
     def test_connections():
         try:
-            conn1.execute('SELECT 1')
+            conn = get_db_connection()
+            conn.execute('SELECT 1')
+            conn.close()
             return True
         except Exception:
             return False
 
     def check_duplicate_record(sentence, lang):
-        cursor = conn1.execute(
+        conn = get_db_connection()
+        cursor = conn.execute(
             'SELECT id FROM records WHERE sentence = ? AND lang = ?',
             (sentence, lang)
         )
@@ -60,10 +71,13 @@ def create_app():
         retries = 3
         for attempt in range(retries):
             try:
-                conn1.execute(
+                conn = get_db_connection()
+                conn.execute(
                     'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
                     (lang, sentence, mean, example, 0, 0)
                 )
+                conn.commit()
+                conn.close()
                 return True
             except Exception:
                 if attempt < retries - 1:
@@ -74,56 +88,65 @@ def create_app():
 
     def search_in_databases(query):
         results = []
-        cursor = conn1.execute(
+        conn = get_db_connection()
+        cursor = conn.execute(
             'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
             (1,)
         )
         records = cursor.fetchall()
         for row in records:
-            if query.lower() in row[1].lower():
+            if query.lower() in row['sentence'].lower():
                 results.append({
-                    'id': row[0],
-                    'sentence': row[1],
-                    'lang': row[2],
-                    'mean': row[3],
-                    'example': row[4],
-                    'search_count': row[5],
+                    'id': row['id'],
+                    'sentence': row['sentence'],
+                    'lang': row['lang'],
+                    'mean': row['mean'],
+                    'example': row['example'],
+                    'search_count': row['search_count'],
                 })
+        conn.close()
         return results
 
     def get_record_by_id(record_id):
-        cursor = conn1.execute(
+        conn = get_db_connection()
+        cursor = conn.execute(
             'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
             (record_id,)
         )
         row = cursor.fetchone()
+        conn.close()
         if row:
             return {
-                'id': row[0],
-                'lang': row[1],
-                'sentence': row[2],
-                'mean': row[3],
-                'example': row[4]
+                'id': row['id'],
+                'lang': row['lang'],
+                'sentence': row['sentence'],
+                'mean': row['mean'],
+                'example': row['example']
             }
         return None
 
     def update_record_in_db(record_id, lang, sentence, mean, example):
         try:
-            conn1.execute(
+            conn = get_db_connection()
+            conn.execute(
                 'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
                 (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
             )
+            conn.commit()
+            conn.close()
             return True
         except Exception:
             return False
 
     def get_records_for_admin():
         records = []
-        cursor = conn1.execute('SELECT id, lang, sentence, approved, search_count FROM records')
+        conn = get_db_connection()
+        cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
         records.extend([
-            {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
+            {'id': row['id'], 'lang': row['lang'], 'sentence': row['sentence'], 'approved': bool(row['approved']), 'search_count': row['search_count']}
             for row in cursor.fetchall()
         ])
+        conn.close()
         return records
 
     @app.route('/')
@@ -253,7 +276,10 @@ def create_app():
             return "Database connection error.", 500
 
         try:
-            conn1.execute('DELETE FROM records WHERE id = ?', (record_id,))
+            conn = get_db_connection()
+            conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
+            conn.commit()
+            conn.close()
             flash('Record deleted successfully.', 'success')
             return redirect(url_for('admin_dashboard', key='William12@OD'))
         except Exception:
@@ -266,7 +292,10 @@ def create_app():
             return "Database connection error.", 500
 
         try:
-            conn1.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
+            conn = get_db_connection()
+            conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
+            conn.commit()
+            conn.close()
             flash('Record approved successfully.', 'success')
         except Exception:
             flash('Failed to approve record.', 'danger')
