@@ -16,16 +16,11 @@ def create_app():
 
     db_url = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
 
-    def get_db_connection(retries=3):
-        attempt = 0
-        while attempt < retries:
-            try:
-                conn = sqlitecloud.connect(db_url)
-                conn.row_factory = sqlitecloud.Row
-                return conn
-            except Exception:
-                attempt += 1
-        return None
+    def get_db_connection():
+        conn = sqlitecloud.connect("sqlitecloud://cje5zuxinz.sqlite.cloud:8860?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE")
+        conn.execute(f"USE DATABASE dicgo.sqlite")
+        conn.row_factory = sqlitecloud.Row
+        return conn
 
     def create_tables():
         conn = get_db_connection()
