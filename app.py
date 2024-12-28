@@ -21,18 +21,11 @@ def create_app():
         while attempt < retries:
             try:
                 conn = sqlitecloud.connect(db_url)
+                conn.row_factory = sqlitecloud.Row
                 return conn
             except Exception:
                 attempt += 1
         return None
-
-    def ensure_table_columns():
-        conn = get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            cursor.execute('PRAGMA table_info(records);')
-            existing_columns = [column[1] for column in cursor.fetchall()]
-            conn.close()
 
     def create_tables():
         conn = get_db_connection()
@@ -50,7 +43,6 @@ def create_app():
                 )
             ''')
             conn.close()
-            ensure_table_columns()
 
     create_tables()
 
@@ -94,17 +86,9 @@ def create_app():
                 'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
                 (1,)
             )
-            records = cursor.fetchall()
-            for row in records:
+            for row in cursor.fetchall():
                 if query.lower() in row['sentence'].lower():
-                    results.append({
-                        'id': row['id'],
-                        'sentence': row['sentence'],
-                        'lang': row['lang'],
-                        'mean': row['mean'],
-                        'example': row['example'],
-                        'search_count': row['search_count'],
-                    })
+                    results.append(dict(row))
             conn.close()
         return results
 
@@ -117,15 +101,7 @@ def create_app():
             )
             row = cursor.fetchone()
             conn.close()
-            if row:
-                return {
-                    'id': row['id'],
-                    'lang': row['lang'],
-                    'sentence': row['sentence'],
-                    'mean': row['mean'],
-                    'example': row['example']
-                }
-        return None
+            return dict(row) if row else None
 
     def update_record_in_db(record_id, lang, sentence, mean, example):
         conn = get_db_connection()
@@ -146,21 +122,13 @@ def create_app():
         conn = get_db_connection()
         if conn:
             cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
-            records.extend([
-                {'id': row['id'], 'lang': row['lang'], 'sentence': row['sentence'], 'approved': bool(row['approved']), 'search_count': row['search_count']}
-                for row in cursor.fetchall()
-            ])
+            records.extend([dict(row) for row in cursor.fetchall()])
             conn.close()
         return records
 
     @app.route('/')
     def home():
-        return render_template(
-            'home.html',
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
+        return render_template('home.html', site_name=app.config['SITE_NAME'], slogan=app.config['SLOGAN'])
 
     @app.route('/add', methods=['GET', 'POST'])
     def add_record():
@@ -179,13 +147,7 @@ def create_app():
                 flash('Record added successfully! Awaiting approval.', 'success')
                 return redirect(url_for('home'))
 
-        return render_template(
-            'add_record.html',
-            form=form,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
+        return render_template('add_record.html', form=form, site_name=app.config['SITE_NAME'], slogan=app.config['SLOGAN'])
 
     @app.route('/search', methods=['GET'])
     def search():
@@ -198,16 +160,7 @@ def create_app():
         total_pages = ceil(total_items / items_per_page)
         results = results[(page - 1) * items_per_page:page * items_per_page]
 
-        return render_template(
-            'search_results.html',
-            results=results,
-            query=query,
-            page=page,
-            total_pages=total_pages,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
+        return render_template('search_results.html', results=results, query=query, page=page, total_pages=total_pages)
 
     @app.route('/admincp', methods=['GET', 'POST'])
     def admin_dashboard():
@@ -222,15 +175,7 @@ def create_app():
         total_pages = ceil(total_items / items_per_page)
         records = records[(page - 1) * items_per_page:page * items_per_page]
 
-        return render_template(
-            'admin_dashboard.html',
-            records=records,
-            total_records=total_items,
-            total_pages=total_pages,
-            page=page,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN']
-        )
+        return render_template('admin_dashboard.html', records=records, total_records=total_items, total_pages=total_pages)
 
     @app.route('/edit/<int:record_id>', methods=['GET', 'POST'])
     def edit_record(record_id):
@@ -256,14 +201,7 @@ def create_app():
         form.mean.data = record['mean']
         form.example.data = record['example']
 
-        return render_template(
-            'edit_record.html',
-            form=form,
-            record=record,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
+        return render_template('edit_record.html', form=form, record=record, site_name=app.config['SITE_NAME'])
 
     @app.route('/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
