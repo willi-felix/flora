@@ -3,3 +3,4 @@ libsql_experimental
 fuzzywuzzy
 pytz
 Flask-WTF
+WTForms
