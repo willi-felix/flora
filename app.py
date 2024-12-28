@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
-import sqlitecloud
+import libsql
 from math import ceil
 import pytz
 from flask_wtf import FlaskForm
@@ -13,8 +13,8 @@ def create_app():
     app.config['SLOGAN'] = 'Search & Learn Effortlessly'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
-    connection_string = "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE"
-    conn1 = sqlitecloud.connect(connection_string)
+    connection_string = "libsql://digo-minyoongi.aws-us-west-2.turso.io"
+    conn1 = libsql.connect(connection_string, token="eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3MzUzNjk5NDcsImlkIjoiMzExN2U2YjItODMyMi00ZmY2LThjNjMtOGNiODI0ZmQ1MTMzIn0.-WQhTc4cwZORMh0kPyVXEw99IM0vxWB_LTCgyBopsrV5MXQVQve8DsPwjoPu7hoH3QJ6MY5osR6g91FKHTShAA"
 
     def create_tables(connection):
         with connection:
