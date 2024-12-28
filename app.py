@@ -17,23 +17,22 @@ def create_app():
     conn1 = libsql.connect(connection_string)
 
     def create_tables(connection):
-        with connection:
-            connection.execute('''
-                CREATE TABLE IF NOT EXISTS records (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    lang TEXT NOT NULL,
-                    sentence TEXT NOT NULL,
-                    mean TEXT NOT NULL,
-                    example TEXT NOT NULL,
-                    approved INTEGER DEFAULT 0,
-                    search_count INTEGER DEFAULT 0,
-                    last_updated INTEGER DEFAULT 0
-                )
-            ''')
-            cursor = connection.execute("PRAGMA table_info(records)")
-            columns = [column[1] for column in cursor.fetchall()]
-            if 'last_updated' not in columns:
-                connection.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
+        connection.execute('''
+            CREATE TABLE IF NOT EXISTS records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lang TEXT NOT NULL,
+                sentence TEXT NOT NULL,
+                mean TEXT NOT NULL,
+                example TEXT NOT NULL,
+                approved INTEGER DEFAULT 0,
+                search_count INTEGER DEFAULT 0,
+                last_updated INTEGER DEFAULT 0
+            )
+        ''')
+        cursor = connection.execute("PRAGMA table_info(records)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'last_updated' not in columns:
+            connection.execute('ALTER TABLE records ADD COLUMN last_updated INTEGER DEFAULT 0')
 
     create_tables(conn1)
 
@@ -51,22 +50,20 @@ def create_app():
             return False
 
     def check_duplicate_record(sentence, lang):
-        with conn1:
-            cursor = conn1.execute(
-                'SELECT id FROM records WHERE sentence = ? AND lang = ?',
-                (sentence, lang)
-            )
-            return cursor.fetchone() is not None
+        cursor = conn1.execute(
+            'SELECT id FROM records WHERE sentence = ? AND lang = ?',
+            (sentence, lang)
+        )
+        return cursor.fetchone() is not None
 
     def insert_record_to_db(lang, sentence, mean, example):
         retries = 3
         for attempt in range(retries):
             try:
-                with conn1:
-                    conn1.execute(
-                        'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
-                        (lang, sentence, mean, example, 0, 0)
-                    )
+                conn1.execute(
+                    'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                    (lang, sentence, mean, example, 0, 0)
+                )
                 return True
             except Exception as e:
                 if attempt < retries - 1:
@@ -78,60 +75,56 @@ def create_app():
 
     def search_in_databases(query):
         results = []
-        with conn1:
-            cursor = conn1.execute(
-                'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
-                (1,)
-            )
-            records = cursor.fetchall()
-            for row in records:
-                if query.lower() in row[1].lower():
-                    results.append({
-                        'id': row[0],
-                        'sentence': row[1],
-                        'lang': row[2],
-                        'mean': row[3],
-                        'example': row[4],
-                        'search_count': row[5],
-                    })
+        cursor = conn1.execute(
+            'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?',
+            (1,)
+        )
+        records = cursor.fetchall()
+        for row in records:
+            if query.lower() in row[1].lower():
+                results.append({
+                    'id': row[0],
+                    'sentence': row[1],
+                    'lang': row[2],
+                    'mean': row[3],
+                    'example': row[4],
+                    'search_count': row[5],
+                })
         return results
 
     def get_record_by_id(record_id):
-        with conn1:
-            cursor = conn1.execute(
-                'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
-                (record_id,)
-            )
-            row = cursor.fetchone()
-            if row:
-                return {
-                    'id': row[0],
-                    'lang': row[1],
-                    'sentence': row[2],
-                    'mean': row[3],
-                    'example': row[4]
-                }
+        cursor = conn1.execute(
+            'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
+            (record_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                'id': row[0],
+                'lang': row[1],
+                'sentence': row[2],
+                'mean': row[3],
+                'example': row[4]
+            }
         return None
 
     def update_record_in_db(record_id, lang, sentence, mean, example):
         try:
-            with conn1:
-                conn1.execute(
-                    'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
-                    (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
-                )
+            conn1.execute(
+                'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ?, last_updated = ? WHERE id = ?',
+                (lang, sentence, mean, example, int(datetime.now(pytz.utc).timestamp()), record_id)
+            )
             return True
         except Exception:
             return False
 
     def get_records_for_admin():
         records = []
-        with conn1:
-            cursor = conn1.execute('SELECT id, lang, sentence, approved, search_count FROM records')
-            records.extend([
-                {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
-                for row in cursor.fetchall()
-            ])
+        cursor = conn1.execute('SELECT id, lang, sentence, approved, search_count FROM records')
+        records.extend([
+            {'id': row[0], 'lang': row[1], 'sentence': row[2], 'approved': bool(row[3]), 'search_count': row[4]}
+            for row in cursor.fetchall()
+        ])
         return records
 
     @app.route('/')
@@ -265,10 +258,9 @@ def create_app():
             return "Database connection error.", 500
 
         try:
-            with conn1:
-                conn1.execute('DELETE FROM records WHERE id = ?', (record_id,))
-                flash('Record deleted successfully.', 'success')
-                return redirect(url_for('admin_dashboard', key='William12@OD'))
+            conn1.execute('DELETE FROM records WHERE id = ?', (record_id,))
+            flash('Record deleted successfully.', 'success')
+            return redirect(url_for('admin_dashboard', key='William12@OD'))
         except Exception:
             flash('Failed to delete record.', 'danger')
             return redirect(url_for('admin_dashboard', key='William12@OD'))
