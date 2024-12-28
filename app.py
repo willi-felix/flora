@@ -65,11 +65,10 @@ def create_app():
                     (lang, sentence, mean, example, 0, 0)
                 )
                 return True
-            except Exception as e:
+            except Exception:
                 if attempt < retries - 1:
                     continue
                 else:
-                    flash(f'Error adding record: {str(e)}. Please try again later.', 'danger')
                     return False
         return False
 
@@ -156,8 +155,6 @@ def create_app():
                 flash('Record added successfully! Awaiting approval.', 'success')
                 return redirect(url_for('home'))
 
-            flash('Failed to add record to the database.', 'danger')
-
         return render_template(
             'add_record.html',
             form=form,
@@ -236,8 +233,6 @@ def create_app():
                 flash('Record updated successfully!', 'success')
                 return redirect(url_for('home'))
 
-            flash('Failed to update record.', 'danger')
-
         form.lang.data = record['lang']
         form.sentence.data = record['sentence']
         form.mean.data = record['mean']
@@ -264,6 +259,19 @@ def create_app():
         except Exception:
             flash('Failed to delete record.', 'danger')
             return redirect(url_for('admin_dashboard', key='William12@OD'))
+
+    @app.route('/approve/<int:record_id>', methods=['POST'])
+    def approve_record(record_id):
+        if not test_connections():
+            return "Database connection error.", 500
+
+        try:
+            conn1.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
+            flash('Record approved successfully.', 'success')
+        except Exception:
+            flash('Failed to approve record.', 'danger')
+
+        return redirect(url_for('admin_dashboard', key='William12@OD'))
 
     return app
 
