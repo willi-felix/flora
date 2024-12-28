@@ -3,6 +3,19 @@
 {% block content %}
 <div class="bg-white shadow-md rounded-md p-6 max-w-lg mx-auto mt-8">
     <h2 class="text-3xl font-bold text-center text-teal-600 mb-4">Add Your Record</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-4">
+            {% for category, message in messages %}
+            <div class="text-white p-3 rounded-md {{ 'bg-green-500' if category == 'success' else 'bg-red-500' }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
     <form action="/add" method="POST">
         <label for="lang" class="block text-gray-700">Language:</label>
         <input 
