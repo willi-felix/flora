@@ -3,6 +3,9 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash
 from math import ceil
 import pytz
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField
+from wtforms.validators import DataRequired
 from fuzzywuzzy import fuzz
 
 def create_app():
@@ -50,6 +53,52 @@ def create_app():
 
     create_tables()
 
+    class RecordForm(FlaskForm):
+        lang = StringField('Language', validators=[DataRequired()])
+        sentence = TextAreaField('Sentence', validators=[DataRequired()])
+        mean = TextAreaField('Meaning', validators=[DataRequired()])
+        example = TextAreaField('Example', validators=[DataRequired()])
+
+    def check_duplicate_record(sentence, lang):
+        conn = get_db_connection()
+        if conn:
+            try:
+                cursor = conn.execute(
+                    'SELECT id FROM records WHERE sentence = ? AND lang = ?',
+                    (sentence, lang)
+                )
+                record = cursor.fetchone()
+                conn.close()
+                return record is not None
+            except Exception as e:
+                print(f"Error checking duplicates: {e}")
+                conn.close()
+                return False
+        print("Database connection failed during duplicate check.")
+        return False
+
+    def insert_record_to_db(lang, sentence, mean, example):
+        retries = 3
+        for attempt in range(retries):
+            conn = get_db_connection()
+            if conn:
+                try:
+                    conn.execute(
+                        'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
+                        (lang, sentence, mean, example, 0, 0)
+                    )
+                    conn.commit()
+                    conn.close()
+                    return True
+                except Exception as e:
+                    print(f"Error inserting record on attempt {attempt + 1}: {e}")
+                    conn.close()
+                    if attempt < retries - 1:
+                        continue
+                    else:
+                        return False
+        return False
+
     def search_in_databases(query):
         results = []
         conn = get_db_connection()
@@ -60,8 +109,8 @@ def create_app():
             )
             records = cursor.fetchall()
             for row in records:
-                similarity_score = fuzz.ratio(query.lower(), row['sentence'].lower())
-                if similarity_score >= 60:
+                relevance_score = fuzz.ratio(query.lower(), row['sentence'].lower())
+                if relevance_score > 50:
                     results.append({
                         'id': row['id'],
                         'sentence': row['sentence'],
@@ -69,10 +118,11 @@ def create_app():
                         'mean': row['mean'],
                         'example': row['example'],
                         'search_count': row['search_count'],
-                        'similarity': similarity_score
+                        'relevance_score': relevance_score
                     })
             conn.close()
-        results = sorted(results, key=lambda x: x['similarity'], reverse=True)
+
+        results = sorted(results, key=lambda x: x['relevance_score'], reverse=True)
         return results
 
     def get_record_by_id(record_id):
