@@ -89,16 +89,12 @@ def create_app():
                         return False
         return False
 
-    def search_in_databases(query, language_filter=None):
+    def search_in_databases(query):
         results = []
         conn = get_db_connection()
         if conn:
             sql = 'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?'
             params = [1]
-
-            if language_filter:
-                sql += ' AND lang = ?'
-                params.append(language_filter)
 
             cursor = conn.execute(sql, params)
             records = cursor.fetchall()
@@ -190,9 +186,8 @@ def create_app():
     @app.route('/search', methods=['GET'])
     def search():
         query = request.args.get('query', '').strip()
-        language_filter = request.args.get('language', '').strip()
         page = int(request.args.get('page', 1))
-        results = search_in_databases(query, language_filter)
+        results = search_in_databases(query)
 
         items_per_page = 5
         total_items = len(results)
@@ -203,7 +198,6 @@ def create_app():
             'search_results.html',
             results=results,
             query=query,
-            language_filter=language_filter,
             page=page,
             total_pages=total_pages,
             site_name=app.config['SITE_NAME'],
