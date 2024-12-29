@@ -16,7 +16,7 @@
         {% endif %}
     {% endwith %}
 
-    <form action="/add" method="POST">
+    <form action="{{ url_for('add_record') }}" method="POST">
         <label for="lang" class="block text-gray-700">Language:</label>
         <input 
             type="text" 
