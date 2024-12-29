@@ -11,6 +11,21 @@
 
         <h2 class="text-2xl font-bold text-teal-600 mb-4">Search Results for "{{ query }}"</h2>
 
+        <!-- Language Filter Form -->
+        <div class="mb-4">
+            <form action="{{ url_for('search') }}" method="get" class="flex space-x-4">
+                <input type="text" name="query" value="{{ query }}" class="border border-gray-300 rounded-md p-2" placeholder="Search query">
+                <select name="language" class="border border-gray-300 rounded-md p-2">
+                    <option value="">All Languages</option>
+                    <option value="English" {% if language_filter == 'English' %}selected{% endif %}>English</option>
+                    <option value="Spanish" {% if language_filter == 'Spanish' %}selected{% endif %}>Spanish</option>
+                    <option value="French" {% if language_filter == 'French' %}selected{% endif %}>French</option>
+                    <!-- Add more language options here -->
+                </select>
+                <button type="submit" class="bg-teal-500 text-white rounded-md p-2">Filter</button>
+            </form>
+        </div>
+
         {% if results %}
         <div class="space-y-4">
             {% for result in results %}
@@ -30,10 +45,10 @@
             </div>
             <div>
                 {% if page > 1 %}
-                <a href="{{ url_for('search', query=query, page=page-1) }}" class="text-blue-500 hover:underline">Previous</a>
+                <a href="{{ url_for('search', query=query, language=language_filter, page=page-1) }}" class="text-blue-500 hover:underline">Previous</a>
                 {% endif %}
                 {% if page < total_pages %}
-                <a href="{{ url_for('search', query=query, page=page+1) }}" class="text-blue-500 hover:underline ml-4">Next</a>
+                <a href="{{ url_for('search', query=query, language=language_filter, page=page+1) }}" class="text-blue-500 hover:underline ml-4">Next</a>
                 {% endif %}
             </div>
         </div>
