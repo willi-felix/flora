@@ -16,8 +16,10 @@ def create_app():
     def get_db_connection():
         try:
             conn = sqlitecloud.connect("sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE")
+            conn.row_factory = sqlitecloud.Row
             return conn
-        except Exception:
+        except Exception as e:
+            print(f"Database connection error: {e}")
             return None
 
     def ensure_table_columns():
@@ -59,11 +61,20 @@ def create_app():
     def check_duplicate_record(sentence, lang):
         conn = get_db_connection()
         if conn:
-            cursor = conn.execute(
-                'SELECT id FROM records WHERE sentence = ? AND lang = ?',
-                (sentence, lang)
-            )
-            return cursor.fetchone() is not None
+            try:
+                cursor = conn.execute(
+                    'SELECT id FROM records WHERE sentence = ? AND lang = ?',
+                    (sentence, lang)
+                )
+                record = cursor.fetchone()
+                conn.close()
+                print(f"Duplicate check: Found={bool(record)} for sentence='{sentence}', lang='{lang}'")
+                return record is not None
+            except Exception as e:
+                print(f"Error checking duplicates: {e}")
+                conn.close()
+                return False
+        print("Database connection failed during duplicate check.")
         return False
 
     def insert_record_to_db(lang, sentence, mean, example):
@@ -77,13 +88,17 @@ def create_app():
                         (lang, sentence, mean, example, 0, 0)
                     )
                     conn.commit()
+                    print(f"Record inserted successfully: lang={lang}, sentence={sentence}, mean={mean}, example={example}")
                     conn.close()
                     return True
-                except Exception:
+                except Exception as e:
+                    print(f"Error inserting record on attempt {attempt + 1}: {e}")
+                    conn.close()
                     if attempt < retries - 1:
                         continue
                     else:
                         return False
+        print("Failed to insert record after retries.")
         return False
 
     def search_in_databases(query):
@@ -138,7 +153,8 @@ def create_app():
                 conn.commit()
                 conn.close()
                 return True
-            except Exception:
+            except Exception as e:
+                print(f"Error updating record: {e}")
                 return False
         return False
 
@@ -172,6 +188,8 @@ def create_app():
             mean = form.mean.data.strip()
             example = form.example.data.strip()
 
+            print(f"Form data received: lang={lang}, sentence={sentence}, mean={mean}, example={example}")
+
             if check_duplicate_record(sentence, lang):
                 flash('This record already exists in the database.', 'warning')
                 return redirect(url_for('home'))
@@ -179,6 +197,8 @@ def create_app():
             if insert_record_to_db(lang, sentence, mean, example):
                 flash('Record added successfully! Awaiting approval.', 'success')
                 return redirect(url_for('home'))
+            else:
+                flash('Failed to add record to the database.', 'danger')
 
         return render_template(
             'add_record.html',
@@ -287,10 +307,25 @@ def create_app():
             conn.commit()
             conn.close()
             flash('Record approved successfully.', 'success')
-        except Exception:
+        except Exception as e:
+            print(f"Error approving record: {e}")
             flash('Failed to approve record.', 'danger')
 
         return redirect(url_for('admin_dashboard', key='William12@OD'))
+
+    @app.route('/debug_records', methods=['GET'])
+    def debug_records():
+        conn = get_db_connection()
+        if conn:
+            try:
+                cursor = conn.execute('SELECT * FROM records')
+                records = cursor.fetchall()
+                conn.close()
+                return {'records': [dict(record) for record in records]}
+            except Exception as e:
+                conn.close()
+                return {'error': str(e)}, 500
+        return {'error': 'Failed to connect to database'}, 500
 
     return app
 
