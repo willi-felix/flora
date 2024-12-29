@@ -302,6 +302,27 @@ def create_app():
                 return {'error': str(e)}, 500
         return {'error': 'Failed to connect to database'}, 500
 
+    @app.route('/add', methods=['GET', 'POST'])
+    def add_record():
+        form = RecordForm()
+        if form.validate_on_submit():
+            lang = form.lang.data.strip()
+            sentence = form.sentence.data.strip()
+            mean = form.mean.data.strip()
+            example = form.example.data.strip()
+            if insert_record_to_db(lang, sentence, mean, example):
+                flash('Record added successfully!', 'success')
+                return redirect(url_for('home'))
+            else:
+                flash('Failed to add record.', 'danger')
+        return render_template(
+            'add_record.html',
+            form=form,
+            site_name=app.config['SITE_NAME'],
+            slogan=app.config['SLOGAN'],
+            current_year=datetime.now(pytz.utc).year
+        )
+
     return app
 
 app = create_app()
