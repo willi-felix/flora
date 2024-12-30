@@ -16,8 +16,7 @@ def create_app():
 
     def get_db_connection():
         try:
-            conn = sqlitecloud.connect(
-                "sqlitecloud://cje5zuxinz.sqlite.cloud:8860/dicgo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE")
+            conn = sqlitecloud.connect("sqlitecloud://cje5zuxinz.sqlite.cloud:8860/digo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE")
             conn.row_factory = sqlitecloud.Row
             return conn
         except Exception as e:
