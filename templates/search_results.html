@@ -4,7 +4,7 @@
 <div class="flex flex-col justify-center items-center h-5/6 overflow-hidden">
     <div class="flex-grow max-w-7xl mx-auto mt-6 p-4">
         <div class="flex justify-between items-center mb-4">
-            <a href="{{ url_for('home') }}" class="text-blue-500 hover:underline flex items-center">
+            <a href="{{ url_for('home') }}" class="text-green-500 hover:underline flex items-center">
                 <span class="material-icons mr-1">arrow_back</span> Back
             </a>
         </div>
@@ -15,11 +15,9 @@
         <div class="space-y-4">
             {% for result in results %}
             <div class="p-4 bg-white rounded-2xl shadow-md w-full sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
-                <h2 class="text-lg font-bold text-gray-800">{{ result.sentence }}</h2>
-                <p class="text-gray-600"><span class="font-semibold">Language:</span> {{ result.lang }}</p>
-                <p class="text-gray-600"><span class="font-semibold">Meaning:</span> {{ result.mean }}</p>
-                <p class="text-gray-600"><span class="font-semibold">Example:</span> <span class="italic">{{ result.example }}</span></p>
-                <p class="text-gray-600"><span class="font-semibold">Relevance Score:</span> {{ result.relevance_score }}</p>
+                <h2 class="text-lg font-bold text-gray-800">{{ result.species_name }} ({{ result.family_name }})</h2>
+                <p class="text-gray-600"><span class="font-semibold">Uses:</span> {{ result.uses }}</p>
+                <p class="text-gray-600"><span class="font-semibold">Classification:</span> {{ result.classification }}</p>
             </div>
             {% endfor %}
         </div>
@@ -30,10 +28,10 @@
             </div>
             <div>
                 {% if page > 1 %}
-                <a href="{{ url_for('search', query=query, page=page-1) }}" class="text-blue-500 hover:underline">Previous</a>
+                <a href="{{ url_for('search', query=query, page=page-1) }}" class="text-green-500 hover:underline">Previous</a>
                 {% endif %}
                 {% if page < total_pages %}
-                <a href="{{ url_for('search', query=query, page=page+1) }}" class="text-blue-500 hover:underline ml-4">Next</a>
+                <a href="{{ url_for('search', query=query, page=page+1) }}" class="text-green-500 hover:underline ml-4">Next</a>
                 {% endif %}
             </div>
         </div>
