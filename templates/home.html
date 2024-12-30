@@ -1,20 +1,29 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ site_name }} - {{ slogan }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
 
-{% block content %}
-<div class="flex flex-col justify-center items-center h-5/6 overflow-hidden bg-gradient-to-r from-[#81C784] to-[#388E3C] fixed top-0 left-0 right-0">
-    <h2 class="text-4xl font-bold text-[#2E7D32] mb-6">Welcome to {{ site_name }}</h2>
-    <form action="{{ url_for('search') }}" method="get" class="w-full max-w-lg">
-        <input 
-            type="text" 
-            name="query" 
-            placeholder="Search for a plant species..." 
-            class="p-4 w-full border border-gray-300 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-[#2E7D32]" 
-            required>
-        <button 
-            type="submit" 
-            class="w-full mt-4 p-3 bg-[#2E7D32] text-white font-bold rounded-full hover:bg-[#388E3C] shadow-md">
-            Search
-        </button>
-    </form>
-</div>
-{% endblock %}
+    <header class="bg-green-500 text-white py-6">
+        <div class="container mx-auto text-center">
+            <h1 class="text-4xl font-bold">{{ site_name }}</h1>
+            <p class="mt-2">{{ slogan }}</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto mt-6">
+        <h2 class="text-3xl font-semibold text-center">Welcome to {{ site_name }}</h2>
+        <p class="mt-4 text-center text-lg">Explore the world of plants and their uses.</p>
+    </main>
+
+    <footer class="bg-green-500 text-white py-4 mt-6">
+        <div class="container mx-auto text-center">
+            <p>&copy; {{ current_year }} {{ site_name }}. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
