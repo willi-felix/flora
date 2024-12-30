@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 </head>
 <body class="font-sans bg-gray-100 flex flex-col min-h-screen">
+    <!-- Sticky Header -->
     <header class="bg-[#2E7D32] text-white sticky top-0 z-10 shadow-md">
         <div class="max-w-6xl mx-auto flex justify-between items-center p-4">
             <div>
@@ -24,12 +25,17 @@
         </div>
         <div class="border-t border-black"></div>
     </header>
+
+    <!-- Content -->
     <main class="max-w-4xl mx-auto p-4 flex-grow">
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Sticky Footer -->
     <footer class="bg-gray-800 text-white text-center py-2 mt-auto">
         <p>&copy; {{ current_year }} {{ site_name }}. All rights reserved.</p>
     </footer>
+
     <style>
         * {
             font-family: "Noto Sans", sans-serif;
