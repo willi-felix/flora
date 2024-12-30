@@ -67,28 +67,6 @@ def create_app():
                 return False
         return False
 
-    def insert_record_to_db(lang, sentence, mean, example):
-        retries = 3
-        for attempt in range(retries):
-            conn = get_db_connection()
-            if conn:
-                try:
-                    conn.execute(
-                        'INSERT INTO records (lang, sentence, mean, example, approved, search_count) VALUES (?, ?, ?, ?, ?, ?)',
-                        (lang, sentence, mean, example, 0, 0)
-                    )
-                    conn.commit()
-                    conn.close()
-                    return True
-                except Exception as e:
-                    print(f"Error inserting record on attempt {attempt + 1}: {e}")
-                    conn.close()
-                    if attempt < retries - 1:
-                        continue
-                    else:
-                        return False
-        return False
-
     def search_in_databases(query):
         results = []
         conn = get_db_connection()
@@ -301,27 +279,6 @@ def create_app():
                 conn.close()
                 return {'error': str(e)}, 500
         return {'error': 'Failed to connect to database'}, 500
-
-    @app.route('/add', methods=['GET', 'POST'])
-    def add_record():
-        form = RecordForm()
-        if form.validate_on_submit():
-            lang = form.lang.data.strip()
-            sentence = form.sentence.data.strip()
-            mean = form.mean.data.strip()
-            example = form.example.data.strip()
-            if insert_record_to_db(lang, sentence, mean, example):
-                flash('Record added successfully!', 'success')
-                return redirect(url_for('home'))
-            else:
-                flash('Failed to add record.', 'danger')
-        return render_template(
-            'add_record.html',
-            form=form,
-            site_name=app.config['SITE_NAME'],
-            slogan=app.config['SLOGAN'],
-            current_year=datetime.now(pytz.utc).year
-        )
 
     return app
 
