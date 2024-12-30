@@ -9,7 +9,7 @@ from wtforms.validators import DataRequired
 
 def create_app():
     app = Flask(__name__)
-    app.config['SITE_NAME'] = 'Plantopedia'
+    app.config['SITE_NAME'] = 'Flora'
     app.config['SLOGAN'] = 'Discover the World of Plants'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
