@@ -6,17 +6,16 @@ import pytz
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField
 from wtforms.validators import DataRequired
-from fuzzywuzzy import fuzz
 
 def create_app():
     app = Flask(__name__)
-    app.config['SITE_NAME'] = 'Digo'
-    app.config['SLOGAN'] = 'Search & Learn Effortlessly'
+    app.config['SITE_NAME'] = 'Plantopedia'
+    app.config['SLOGAN'] = 'Discover the World of Plants'
     app.config['SECRET_KEY'] = '724f137186bfedbee4456b0cfac7076c567a966eb0c6437c0837772e31ec21ef'
 
     def get_db_connection():
         try:
-            conn = sqlitecloud.connect("sqlitecloud://cje5zuxinz.sqlite.cloud:8860/digo.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE")
+            conn = sqlitecloud.connect("sqlitecloud://cje5zuxinz.sqlite.cloud:8860/plantopedia.sqlite?apikey=SMZSFhzb4qCWGt8VElvtRei2kOKYWEsC1BfInDcS1RE")
             conn.row_factory = sqlitecloud.Row
             return conn
         except Exception as e:
@@ -28,14 +27,13 @@ def create_app():
         if conn:
             cursor = conn.cursor()
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS records (
+                CREATE TABLE IF NOT EXISTS plants (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    lang TEXT NOT NULL,
-                    sentence TEXT NOT NULL,
-                    mean TEXT NOT NULL,
-                    example TEXT NOT NULL,
-                    approved INTEGER DEFAULT 0,
-                    search_count INTEGER DEFAULT 0
+                    species_name TEXT NOT NULL,
+                    family_name TEXT NOT NULL,
+                    uses TEXT NOT NULL,
+                    classification TEXT NOT NULL,
+                    approved INTEGER DEFAULT 0
                 )
             ''')
             conn.commit()
@@ -43,19 +41,19 @@ def create_app():
 
     create_tables()
 
-    class RecordForm(FlaskForm):
-        lang = StringField('Language', validators=[DataRequired()])
-        sentence = TextAreaField('Sentence', validators=[DataRequired()])
-        mean = TextAreaField('Meaning', validators=[DataRequired()])
-        example = TextAreaField('Example', validators=[DataRequired()])
+    class PlantForm(FlaskForm):
+        species_name = StringField('Species Name', validators=[DataRequired()])
+        family_name = StringField('Family Name', validators=[DataRequired()])
+        uses = TextAreaField('Uses', validators=[DataRequired()])
+        classification = StringField('Classification', validators=[DataRequired()])
 
-    def check_duplicate_record(sentence, lang):
+    def check_duplicate_record(species_name, family_name):
         conn = get_db_connection()
         if conn:
             try:
                 cursor = conn.execute(
-                    'SELECT id FROM records WHERE sentence = ? AND lang = ?',
-                    (sentence, lang)
+                    'SELECT id FROM plants WHERE species_name = ? AND family_name = ?',
+                    (species_name, family_name)
                 )
                 record = cursor.fetchone()
                 conn.close()
@@ -70,45 +68,29 @@ def create_app():
         results = []
         conn = get_db_connection()
         if conn:
-            sql = 'SELECT id, sentence, lang, mean, example, search_count FROM records WHERE approved = ?'
+            sql = 'SELECT id, species_name, family_name, uses, classification FROM plants WHERE approved = ?'
             params = [1]
-
             cursor = conn.execute(sql, params)
             records = cursor.fetchall()
 
             for row in records:
-                if len(query) == 1 and query.lower() == row['sentence'].lower():
+                if query.lower() in row['species_name'].lower() or query.lower() in row['family_name'].lower():
                     results.append({
                         'id': row['id'],
-                        'sentence': row['sentence'],
-                        'lang': row['lang'],
-                        'mean': row['mean'],
-                        'example': row['example'],
-                        'search_count': row['search_count'],
-                        'relevance_score': 100
+                        'species_name': row['species_name'],
+                        'family_name': row['family_name'],
+                        'uses': row['uses'],
+                        'classification': row['classification']
                     })
-                elif len(query) > 1:
-                    relevance_score = fuzz.ratio(query.lower(), row['sentence'].lower())
-                    if relevance_score > 50:
-                        results.append({
-                            'id': row['id'],
-                            'sentence': row['sentence'],
-                            'lang': row['lang'],
-                            'mean': row['mean'],
-                            'example': row['example'],
-                            'search_count': row['search_count'],
-                            'relevance_score': relevance_score
-                        })
             conn.close()
 
-        results = sorted(results, key=lambda x: x['relevance_score'], reverse=True)
         return results
 
     def get_record_by_id(record_id):
         conn = get_db_connection()
         if conn:
             cursor = conn.execute(
-                'SELECT id, lang, sentence, mean, example FROM records WHERE id = ?',
+                'SELECT id, species_name, family_name, uses, classification FROM plants WHERE id = ?',
                 (record_id,)
             )
             row = cursor.fetchone()
@@ -116,20 +98,20 @@ def create_app():
             if row:
                 return {
                     'id': row['id'],
-                    'lang': row['lang'],
-                    'sentence': row['sentence'],
-                    'mean': row['mean'],
-                    'example': row['example']
+                    'species_name': row['species_name'],
+                    'family_name': row['family_name'],
+                    'uses': row['uses'],
+                    'classification': row['classification']
                 }
         return None
 
-    def update_record_in_db(record_id, lang, sentence, mean, example):
+    def update_record_in_db(record_id, species_name, family_name, uses, classification):
         conn = get_db_connection()
         if conn:
             try:
                 conn.execute(
-                    'UPDATE records SET lang = ?, sentence = ?, mean = ?, example = ? WHERE id = ?',
-                    (lang, sentence, mean, example, record_id)
+                    'UPDATE plants SET species_name = ?, family_name = ?, uses = ?, classification = ? WHERE id = ?',
+                    (species_name, family_name, uses, classification, record_id)
                 )
                 conn.commit()
                 conn.close()
@@ -143,9 +125,9 @@ def create_app():
         records = []
         conn = get_db_connection()
         if conn:
-            cursor = conn.execute('SELECT id, lang, sentence, approved, search_count FROM records')
+            cursor = conn.execute('SELECT id, species_name, family_name, approved FROM plants')
             records.extend([
-                {'id': row['id'], 'lang': row['lang'], 'sentence': row['sentence'], 'approved': bool(row['approved']), 'search_count': row['search_count']}
+                {'id': row['id'], 'species_name': row['species_name'], 'family_name': row['family_name'], 'approved': bool(row['approved'])}
                 for row in cursor.fetchall()
             ])
             conn.close()
@@ -212,22 +194,22 @@ def create_app():
             flash('Record not found.', 'danger')
             return redirect(url_for('home'))
 
-        form = RecordForm()
+        form = PlantForm()
 
         if form.validate_on_submit():
-            lang = form.lang.data.strip()
-            sentence = form.sentence.data.strip()
-            mean = form.mean.data.strip()
-            example = form.example.data.strip()
+            species_name = form.species_name.data.strip()
+            family_name = form.family_name.data.strip()
+            uses = form.uses.data.strip()
+            classification = form.classification.data.strip()
 
-            if update_record_in_db(record_id, lang, sentence, mean, example):
+            if update_record_in_db(record_id, species_name, family_name, uses, classification):
                 flash('Record updated successfully!', 'success')
                 return redirect(url_for('home'))
 
-        form.lang.data = record['lang']
-        form.sentence.data = record['sentence']
-        form.mean.data = record['mean']
-        form.example.data = record['example']
+        form.species_name.data = record['species_name']
+        form.family_name.data = record['family_name']
+        form.uses.data = record['uses']
+        form.classification.data = record['classification']
 
         return render_template(
             'edit_record.html',
@@ -242,7 +224,7 @@ def create_app():
     def delete_record(record_id):
         try:
             conn = get_db_connection()
-            conn.execute('DELETE FROM records WHERE id = ?', (record_id,))
+            conn.execute('DELETE FROM plants WHERE id = ?', (record_id,))
             conn.commit()
             conn.close()
             flash('Record deleted successfully.', 'success')
@@ -255,7 +237,7 @@ def create_app():
     def approve_record(record_id):
         try:
             conn = get_db_connection()
-            conn.execute('UPDATE records SET approved = ? WHERE id = ?', (1, record_id))
+            conn.execute('UPDATE plants SET approved = ? WHERE id = ?', (1, record_id))
             conn.commit()
             conn.close()
             flash('Record approved successfully.', 'success')
@@ -270,7 +252,7 @@ def create_app():
         conn = get_db_connection()
         if conn:
             try:
-                cursor = conn.execute('SELECT * FROM records')
+                cursor = conn.execute('SELECT * FROM plants')
                 records = cursor.fetchall()
                 conn.close()
                 return {'records': [dict(record) for record in records]}
