@@ -222,6 +222,7 @@ def create_app():
 
     @app.route('/delete/<int:record_id>', methods=['POST'])
     def delete_record(record_id):
+        page = request.args.get('page', 1, type=int)
         try:
             conn = get_db_connection()
             conn.execute('DELETE FROM plants WHERE id = ?', (record_id,))
