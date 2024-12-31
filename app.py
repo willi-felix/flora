@@ -33,7 +33,8 @@ def create_app():
                     family_name TEXT NOT NULL,
                     uses TEXT NOT NULL,
                     classification TEXT NOT NULL,
-                    approved INTEGER DEFAULT 0
+                    approved INTEGER DEFAULT 0,
+                    search_count INTEGER DEFAULT 0
                 )
             ''')
             conn.commit()
@@ -68,7 +69,7 @@ def create_app():
         results = []
         conn = get_db_connection()
         if conn:
-            sql = 'SELECT id, species_name, family_name, uses, classification FROM plants WHERE approved = ?'
+            sql = 'SELECT id, species_name, family_name, uses, classification, search_count FROM plants WHERE approved = ?'
             params = [1]
             cursor = conn.execute(sql, params)
             records = cursor.fetchall()
@@ -82,6 +83,8 @@ def create_app():
                         'uses': row['uses'],
                         'classification': row['classification']
                     })
+                    conn.execute('UPDATE plants SET search_count = search_count + 1 WHERE id = ?', (row['id'],))
+                    conn.commit()
             conn.close()
 
         return results
@@ -229,10 +232,10 @@ def create_app():
             conn.commit()
             conn.close()
             flash('Record deleted successfully.', 'success')
-            return redirect(url_for('admin_dashboard', key='William12@OD'))
         except Exception:
             flash('Failed to delete record.', 'danger')
-            return redirect(url_for('admin_dashboard', key='William12@OD'))
+
+        return redirect(url_for('admin_dashboard', key='William12@OD', page=page))
 
     @app.route('/approve/<int:record_id>', methods=['POST'])
     def approve_record(record_id):
