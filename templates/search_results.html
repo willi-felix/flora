@@ -15,7 +15,8 @@
         <div class="space-y-4">
             {% for result in results %}
             <div class="p-4 bg-white rounded-2xl shadow-md w-full sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
-                <h2 class="text-lg font-bold text-gray-800">{{ result.species_name }} ({{ result.family_name }})</h2>
+                <h2 class="text-lg font-bold text-gray-800">{{ result.species_name }}</h2>
+                <p class="text-gray-600"><span class="font-semibold">Family:</span> {{ result.family_name }}</p>
                 <p class="text-gray-600"><span class="font-semibold">Uses:</span> {{ result.uses }}</p>
                 <p class="text-gray-600"><span class="font-semibold">Classification:</span> {{ result.classification }}</p>
             </div>
